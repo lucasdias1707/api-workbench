@@ -1,10 +1,11 @@
-# [Project name]
+# API Workbench
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Um cliente desktop-like para compor, organizar e enviar requisições HTTP com uma experiência rápida e legível.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/api-workbench run dev` — run the API Workbench frontend
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
@@ -22,23 +23,32 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/api-workbench/src/App.tsx` — shell, request composer, response viewer, history and local persistence
+- `artifacts/api-workbench/src/index.css` — visual theme and responsive layout
+- `artifacts/api-workbench` — deployable frontend artifact
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- O primeiro fluxo é local-first: coleções, rascunhos, ambientes e histórico são persistidos no navegador.
+- O envio usa `fetch` diretamente para manter o cliente útil com qualquer endpoint compatível com CORS.
+- A interface mantém composição e resposta lado a lado em telas largas e troca para uma visão por vez em janelas estreitas.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Navegação por coleções e pastas com requests iniciais de exemplo.
+- Editor de método, URL, parâmetros, headers e body JSON/texto.
+- Seleção de ambientes com interpolação de variáveis `{{variable}}`.
+- Envio real de requisições com status, tempo, tamanho, headers, payload e erros de rede.
+- Histórico local, criação de requests, busca e layout responsivo.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+_Nenhuma preferência persistente registrada._
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Endpoints remotos precisam aceitar requisições do navegador (CORS); falhas aparecem no painel de resposta.
+- As variáveis e tokens de exemplo são dados locais demonstrativos e devem ser substituídos pelo usuário.
 
 ## Pointers
 

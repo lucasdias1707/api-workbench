@@ -59,7 +59,7 @@ jobs:
           workspaces: artifacts/api-workbench/src-tauri -> target
 
       # Força o pnpm a baixar as dependências nativas da plataforma atual do runner
-      - run: pnpm install --frozen-lockfile --supported-architectures current
+      - run: pnpm install --frozen-lockfile
 
       - uses: tauri-apps/tauri-action@v0
         env:

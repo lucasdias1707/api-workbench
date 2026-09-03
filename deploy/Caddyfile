@@ -1,0 +1,48 @@
+# Single public entry point. Serves the built frontend and forwards /api to the
+# companion server on loopback.
+#
+# The password gate is not optional decoration: /api/proxy will forward any HTTP
+# request it is handed, so an unauthenticated deployment is an open proxy that
+# will be found and abused. Covering the whole site (not just /api) is what makes
+# it safe, because a browser app cannot hold a secret of its own.
+#
+# Generate the hash with:  caddy hash-password
+# Caddy < 2.8 spells the directive `basicauth` instead of `basic_auth`.
+#
+# Caddy needs PROXY_SHARED_SECRET in its own environment for the header_up
+# below. Give it the same file the API server uses:
+#   sudo systemctl edit caddy
+#   [Service]
+#   EnvironmentFile=/etc/api-workbench.env
+
+# With a domain, Caddy issues and renews TLS automatically:
+workbench.example.com {
+	basic_auth {
+		# username  bcrypt-hash-from-caddy-hash-password
+		you $2a$14$REPLACE_WITH_YOUR_OWN_HASH
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8080 {
+			# Added server-side, so it never reaches the browser. This is what
+			# makes bypassing Caddy useless even if the bind or a firewall rule
+			# is ever wrong.
+			header_up X-Proxy-Auth {env.PROXY_SHARED_SECRET}
+		}
+	}
+
+	handle {
+		root * /srv/api-workbench/artifacts/api-workbench/dist/public
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+	log {
+		output file /var/log/caddy/api-workbench.log
+	}
+}
+
+# No domain yet? Replace the block above with `:80 { ... }` — same contents.
+# It serves plain HTTP, so the basic-auth password crosses the wire in the
+# clear; treat that as temporary and put a hostname on it before real use.

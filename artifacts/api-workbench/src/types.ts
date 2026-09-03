@@ -69,6 +69,12 @@ export type Folder = {
   name: string;
   color: string;
   sortIndex: number;
+  /**
+   * Variables scoped to this folder and everything under it. They are the
+   * "local" scope: nearer folders win over outer ones, and any folder wins
+   * over an environment.
+   */
+  variables: KeyValue[];
 };
 
 export type Workspace = {
@@ -86,7 +92,38 @@ export type Environment = {
    * layered on top of it, so shared values live in one place.
    */
   isBase: boolean;
+  /** Colour its variables are drawn in, so staging never reads as production. */
+  color: string;
   variables: KeyValue[];
+};
+
+/** Where a resolved variable came from. Folder scope is "local", the rest global. */
+export type VariableScope = 'folder' | 'environment' | 'base';
+
+export type VariableOrigin = {
+  scope: VariableScope;
+  sourceId: string;
+  sourceName: string;
+  color: string;
+  value: string;
+};
+
+export type ResolvedVariable = VariableOrigin & {
+  name: string;
+  /** Definitions this one overrides, nearest first. */
+  shadowed: VariableOrigin[];
+};
+
+export type VariableTable = Record<string, ResolvedVariable>;
+
+/** Syntax colours for the response viewer, editable like an editor theme. */
+export type JsonTheme = {
+  key: string;
+  string: string;
+  number: string;
+  boolean: string;
+  null: string;
+  punctuation: string;
 };
 
 /** How a request should reach the network. */
@@ -103,6 +140,7 @@ export type Settings = {
   timeoutMs: number;
   /** Persist response bodies between reloads. */
   persistResponses: boolean;
+  jsonTheme: JsonTheme;
 };
 
 export type ResponseRecord = {

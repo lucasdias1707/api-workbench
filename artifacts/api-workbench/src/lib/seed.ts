@@ -79,26 +79,28 @@ export function createSeedState(): WorkspaceState {
       folderId: github.id,
       name: 'Public repo',
       method: 'GET',
-      url: 'https://api.github.com/repos/mountain-loop/yaak',
+      url: '{{baseUrl}}/repos/mountain-loop/yaak',
       headers: [row('Accept', 'application/vnd.github+json')],
       sortIndex: 0,
     }),
   ];
 
+  // Only the base environment ships. Anything beyond it is the user's own
+  // staging/production split, created from the environment picker.
   const base = createEnvironment(workspace.id, 'Base', true, [
     row('baseUrl', 'https://httpbin.org'),
     row('token', 'replace-me'),
   ]);
-  const staging = createEnvironment(workspace.id, 'Staging', false, [
-    row('baseUrl', 'https://httpbingo.org'),
-  ]);
+
+  // One folder-scoped variable, to show that a folder can narrow a value.
+  github.variables = [row('baseUrl', 'https://api.github.com')];
 
   return {
     version: STATE_VERSION,
     workspaces: [workspace],
     folders: [playground, inspect, writes, github],
     requests,
-    environments: [base, staging],
+    environments: [base],
     responses: [],
     activeWorkspaceId: workspace.id,
     activeEnvironmentId: null,

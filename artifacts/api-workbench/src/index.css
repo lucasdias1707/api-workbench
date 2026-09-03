@@ -479,35 +479,7 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
 }
 .method-select:focus { border-color: var(--accent); outline: none; }
 
-.url-field {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  height: 30px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg-input);
-}
-.url-field:focus-within { border-color: var(--accent); }
-.url-field input,
-.url-field .url-mirror {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0 9px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 28px;
-  white-space: pre;
-  overflow: hidden;
-}
-.url-field input { color: transparent; caret-color: var(--text-strong); background: transparent; z-index: 1; }
-.url-field input::selection { background: var(--accent-soft); color: transparent; }
-.url-field .url-mirror { pointer-events: none; color: var(--text); }
-.url-field input::placeholder { color: var(--text-faint); }
-.url-var { color: var(--accent); background: var(--accent-soft); border-radius: 3px; }
-.url-var.missing { color: var(--red); background: color-mix(in srgb, var(--red) 15%, transparent); }
+/* The URL bar is a template field; see the template-field rules below. */
 
 /* ---- Tab rows inside panes ---- */
 
@@ -739,12 +711,12 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
   display: grid; place-items: center;
   border: 0; background: transparent; color: var(--text-faint);
 }
-.json-key { color: var(--purple); }
-.json-string { color: var(--green); word-break: break-word; }
-.json-number { color: var(--orange); }
-.json-boolean { color: var(--blue); }
-.json-null { color: var(--text-faint); }
-.json-punct { color: var(--text-faint); }
+.json-key { color: var(--json-key, var(--purple)); }
+.json-string { color: var(--json-string, var(--green)); word-break: break-word; }
+.json-number { color: var(--json-number, var(--orange)); }
+.json-boolean { color: var(--json-boolean, var(--blue)); }
+.json-null { color: var(--json-null, var(--text-faint)); }
+.json-punct { color: var(--json-punct, var(--text-faint)); }
 .json-preview { color: var(--text-faint); font-style: italic; }
 .json-children { border-left: 1px solid var(--border); margin-left: 6px; padding-left: 8px; }
 .json-highlight { background: color-mix(in srgb, var(--yellow) 35%, transparent); border-radius: 2px; }
@@ -784,6 +756,211 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
 }
 .history-row:hover { background: var(--bg-hover); }
 .history-row.active { background: var(--accent-soft); }
+
+/* ==========================================================================
+   Template fields: variables rendered inline, hoverable and clickable
+   ========================================================================== */
+
+.template-field {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+}
+.template-field:focus-within { border-color: var(--accent); }
+
+.template-field > input,
+.template-field > .template-mirror {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 9px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 28px;
+  white-space: pre;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.template-field > input::-webkit-scrollbar,
+.template-mirror::-webkit-scrollbar { display: none; }
+
+.template-field > input {
+  color: transparent;
+  caret-color: var(--text-strong);
+  background: transparent;
+  border: 0;
+  z-index: 1;
+}
+.template-field > input::selection { background: var(--accent-soft); color: transparent; }
+.template-field > input::placeholder { color: var(--text-faint); }
+
+/* The mirror sits above so chips are clickable; it lets the pointer through
+   everywhere else so typing, selection and the caret stay with the input. */
+.template-mirror {
+  z-index: 2;
+  pointer-events: none;
+  color: var(--text);
+}
+
+.var-chip {
+  pointer-events: auto;
+  display: inline;
+  padding: 1px 0;
+  border: 0;
+  border-radius: 3px;
+  font: inherit;
+  color: var(--var-color, var(--accent));
+  background: color-mix(in srgb, var(--var-color, var(--accent)) 17%, transparent);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--var-color, var(--accent)) 55%, transparent);
+  cursor: pointer;
+}
+.var-chip:hover { background: color-mix(in srgb, var(--var-color, var(--accent)) 30%, transparent); }
+.var-chip.missing {
+  color: var(--red);
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  box-shadow: inset 0 -1px 0 var(--red);
+  text-decoration: underline wavy var(--red) 1px;
+  text-underline-offset: 2px;
+}
+
+.var-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+
+.var-popover {
+  position: fixed;
+  z-index: 65;
+  width: min(360px, calc(100vw - 20px));
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-pop);
+}
+.var-popover-head { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.var-popover-head .spacer { flex: 1; }
+.var-popover-origin { font-size: 11px; color: var(--text-dim); }
+.var-popover-origin strong { color: var(--text); font-weight: 600; }
+.var-popover-row { display: flex; align-items: center; gap: 6px; }
+/* .field is width:100%, which in a flex row overlaps whatever follows it. */
+.var-popover-row .field { flex: 1; min-width: 0; width: auto; }
+.var-popover-row .btn { flex: 0 0 auto; }
+.var-popover-shadowed {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   Workspace and environment pickers
+   ========================================================================== */
+
+.workspace-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 3px 5px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+}
+.workspace-button:hover { background: var(--bg-hover); border-color: var(--border); }
+.workspace-button .brand-text { display: grid; min-width: 0; flex: 1; }
+
+.env-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 170px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-input);
+  font-size: 12px;
+  color: var(--text);
+}
+.env-button:hover { border-color: var(--border-strong); background: var(--bg-raised); }
+
+.folder-vars {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-faint);
+  flex: 0 0 auto;
+}
+
+/* ---- Drag and drop ---- */
+
+.tree-row[draggable='true'] { cursor: grab; }
+.tree-row.dragging { opacity: 0.4; }
+.tree-row.drop-into {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.tree-row.drop-before::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.sidebar-tree.drop-into { box-shadow: inset 0 0 0 1px var(--accent); border-radius: var(--radius); }
+
+/* ---- Colour swatches ---- */
+
+.swatches { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.swatch {
+  width: 20px; height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  padding: 0;
+}
+.swatch.active { box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px currentColor; }
+.swatch-custom {
+  width: 24px; height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+
+.color-rows { display: grid; gap: 8px; }
+.color-row {
+  display: grid;
+  grid-template-columns: 96px 32px 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.color-row input[type='color'] {
+  width: 32px; height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  cursor: pointer;
+}
+.color-sample {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-code);
+}
 
 /* ==========================================================================
    Overlays

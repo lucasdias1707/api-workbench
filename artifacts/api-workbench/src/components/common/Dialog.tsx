@@ -15,17 +15,29 @@ type DialogProps = {
 export function Dialog({ title, description, onClose, children, footer, wide, align = 'center', testId }: DialogProps) {
   const ref = useRef<HTMLDivElement>(null);
 
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        closeRef.current();
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    ref.current?.querySelector<HTMLElement>('input, textarea, select, button')?.focus();
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, []);
+
+  // Focus once, on open. Callers pass an inline onClose, so keying this on the
+  // callback re-ran it on every keystroke and stole focus back to the close
+  // button mid-typing.
+  useEffect(() => {
+    const target =
+      ref.current?.querySelector<HTMLElement>('[data-autofocus]') ??
+      ref.current?.querySelector<HTMLElement>('.dialog-body input, .dialog-body textarea, .dialog-body select');
+    target?.focus();
+  }, []);
 
   return (
     <div

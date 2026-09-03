@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Dialog } from '@/components/common/Dialog';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
-import { createEnvironment } from '@/lib/factories';
+import { createEnvironment, ENVIRONMENT_COLORS } from '@/lib/factories';
 import { useWorkspace } from '@/state/workspace-store';
 import type { KeyValue } from '@/types';
 
@@ -14,7 +14,8 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
   const { state, dispatch } = useWorkspace();
   const environments = state.environments.filter((environment) => environment.workspaceId === state.activeWorkspaceId);
   const base = environments.find((environment) => environment.isBase) ?? environments[0];
-  const [selectedId, setSelectedId] = useState(base?.id ?? '');
+  // Open on whatever is in use, so managing follows straight on from picking.
+  const [selectedId, setSelectedId] = useState(state.activeEnvironmentId ?? base?.id ?? '');
 
   const selected = environments.find((environment) => environment.id === selectedId) ?? base;
   if (!selected) return null;
@@ -23,7 +24,14 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
     dispatch({ type: 'environment/update', id: selected.id, patch: { variables } });
 
   const addEnvironment = () => {
-    const environment = createEnvironment(state.activeWorkspaceId, `Environment ${environments.length}`, false, []);
+    const overlays = environments.filter((environment) => !environment.isBase).length;
+    const environment = createEnvironment(
+      state.activeWorkspaceId,
+      `Environment ${overlays + 1}`,
+      false,
+      [],
+      ENVIRONMENT_COLORS[(overlays + 1) % ENVIRONMENT_COLORS.length],
+    );
     dispatch({ type: 'environment/create', environment });
     setSelectedId(environment.id);
   };
@@ -62,6 +70,7 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
                 onClick={() => setSelectedId(environment.id)}
                 data-testid={`button-environment-${environment.id}`}
               >
+                <span className="var-dot" style={{ background: environment.color }} />
                 <span className="tree-name truncate">{environment.name}</span>
                 {environment.isBase ? <span className="tree-count">base</span> : null}
               </button>
@@ -90,11 +99,40 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
             <input
               className="field"
               value={selected.name}
+              data-autofocus
               onChange={(event) => dispatch({ type: 'environment/update', id: selected.id, patch: { name: event.target.value } })}
               aria-label="Environment name"
               data-testid="input-environment-name"
             />
           )}
+
+          <div className="section-label" style={{ margin: 0 }}>
+            Colour
+            <span className="spacer" />
+            <span className="hint" style={{ fontSize: 10 }}>
+              variables from this environment render in it
+            </span>
+          </div>
+          <div className="swatches">
+            {ENVIRONMENT_COLORS.map((color) => (
+              <button
+                key={color}
+                className={`swatch ${selected.color === color ? 'active' : ''}`}
+                style={{ background: color }}
+                onClick={() => dispatch({ type: 'environment/update', id: selected.id, patch: { color } })}
+                aria-label={`Use colour ${color}`}
+                data-testid={`swatch-${color.replace('#', '')}`}
+              />
+            ))}
+            <input
+              type="color"
+              className="swatch-custom"
+              value={selected.color}
+              onChange={(event) => dispatch({ type: 'environment/update', id: selected.id, patch: { color: event.target.value } })}
+              aria-label="Custom environment colour"
+              data-testid="input-environment-color"
+            />
+          </div>
           <KeyValueTable
             items={selected.variables}
             onChange={setVariables}
@@ -103,8 +141,8 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
           />
           <p className="hint">
             {selected.isBase
-              ? 'Base variables apply to every request. Overlay environments override them one value at a time.'
-              : 'Only the variables defined here override the base environment.'}
+              ? 'Base variables apply to every request. Environments layered on top override them one value at a time, and folder variables override both.'
+              : 'Only the variables defined here override the base environment. A folder that defines the same name still wins.'}
           </p>
         </div>
       </div>

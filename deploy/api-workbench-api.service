@@ -1,0 +1,43 @@
+# Companion API server (the request proxy). Copy to
+# /etc/systemd/system/api-workbench-api.service and adjust User and paths.
+[Unit]
+Description=API Workbench companion server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=apiworkbench
+WorkingDirectory=/srv/api-workbench
+ExecStart=/usr/bin/node --enable-source-maps /srv/api-workbench/artifacts/api-server/dist/index.mjs
+Restart=on-failure
+RestartSec=3
+
+# Bind to loopback only: Caddy is the single public entry point, so the proxy
+# is never reachable without passing the auth in front of it.
+Environment=HOST=127.0.0.1
+Environment=PORT=8080
+Environment=NODE_ENV=production
+Environment=LOG_LEVEL=info
+
+# Holds PROXY_ALLOW_PRIVATE_NETWORK and PROXY_SHARED_SECRET. Keep it 0600 and
+# owned by root; see api-workbench.env.example.
+#
+# Reaching private addresses is opt-in. With it on, the server refuses to serve
+# the forwarder at all unless PROXY_SHARED_SECRET is also set, so there is no
+# configuration where it silently exposes the network around it. The OCI
+# instance metadata service at 169.254.169.254 stays blocked either way.
+EnvironmentFile=/etc/api-workbench.env
+
+# The service only needs to make outbound HTTP; deny it everything else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

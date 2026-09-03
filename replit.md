@@ -19,11 +19,13 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 | Variável | Onde | Para quê |
 | --- | --- | --- |
 | `PORT` | ambos | porta do serviço (obrigatória) |
+| `HOST` | servidor | interface de escuta; padrão `0.0.0.0`. Use `127.0.0.1` atrás de um reverse proxy |
 | `BASE_PATH` | frontend | base do Vite (obrigatória) |
 | `API_PROXY_TARGET` | frontend (dev) | destino do proxy `/api`; padrão `http://127.0.0.1:8080` |
 | `VITE_API_BASE_URL` | frontend | base da API quando ela não é same-origin; padrão `/api` |
 | `ALLOWED_ORIGINS` | servidor | lista separada por vírgula de origens permitidas no CORS |
 | `PROXY_ALLOW_PRIVATE_NETWORK` | servidor | libera destinos em rede privada; padrão: ligado fora de produção |
+| `PROXY_SHARED_SECRET` | servidor | exige o header `X-Proxy-Auth`; obrigatório em produção com rede privada liberada |
 | `DATABASE_URL` | servidor | conexão Postgres (usada por `@workspace/db`) |
 | `LOG_LEVEL` | servidor | nível do Pino; padrão `info` |
 
@@ -49,6 +51,7 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 - `lib/storage.ts` / `lib/migrate.ts` — persistência versionada em localStorage e migração do formato antigo
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
+- `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
 - `components/sidebar|request|response|dialogs|layout|common` — UI por área
 - `index.css` — design tokens (tema escuro e claro) e todos os componentes visuais
 
@@ -87,7 +90,14 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 - Resposta: status colorido, tempo, tamanho, tipo; abas Pretty (árvore JSON dobrável com busca),
   Raw, Preview (HTML em iframe isolado), Headers, Cookies e History por requisição
 - Cancelamento de requisição em andamento e timeout configurável
-- Ambientes base + sobreposição, com editor de variáveis
+- Múltiplos workspaces, cada um com suas pastas, requests e ambientes
+- Arrastar requests entre pastas, reordenar e soltar na raiz do workspace
+- Variáveis em três escopos: pasta (local, sempre azul), ambiente e base (cor escolhida
+  por ambiente). A pasta mais próxima ganha, depois o ambiente ativo, depois a base
+- Passar o mouse numa `{{variável}}` mostra valor e origem; clicar abre um popover que
+  edita no lugar, gravando na pasta ou ambiente de onde o valor veio
+- Cores do JSON configuráveis, com presets (Workbench, Monokai, Nord, Solarized)
+- Ambientes base + sobreposição, com editor de variáveis e cor
 - Paleta de comandos (⌘K) e atalhos: ⌘⏎ enviar, ⌘N nova, ⌘W fechar aba, ⌘E ambientes,
   ⌘B barra lateral, ⌘, configurações
 - Importar de curl, copiar como curl, exportar/importar o workspace em JSON
@@ -108,6 +118,13 @@ _Nenhuma preferência persistente registrada._
   `lib/api-zod/src/generated` e `lib/api-client-react/src/generated` são gerados.
 - `artifacts/api-workbench/src/components/ui` é o scaffold do shadcn/ui e não é usado pelo app,
   que tem seu próprio sistema visual em `index.css`.
+
+## Deploy
+
+- `deploy/` traz um runbook para VM (Oracle Cloud Always Free), um unit do systemd e um
+  Caddyfile. Leia a seção de segurança antes de expor: o `/api/proxy` encaminha qualquer
+  requisição e não tem autenticação própria, então precisa de um gate na frente do site
+  inteiro — senão vira proxy HTTP aberto.
 
 ## Pointers
 

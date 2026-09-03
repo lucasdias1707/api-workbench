@@ -1,12 +1,11 @@
-import { useRef } from 'react';
 import { Loader2, Send, Square } from 'lucide-react';
-import { tokenize } from '@/lib/template';
-import { HTTP_METHODS, type HttpMethod } from '@/types';
+import { TemplateField } from '@/components/request/TemplateField';
+import { HTTP_METHODS, type HttpMethod, type VariableTable } from '@/types';
 
 type UrlBarProps = {
   method: HttpMethod;
   url: string;
-  variables: Record<string, string>;
+  variables: VariableTable;
   sending: boolean;
   onMethodChange: (method: HttpMethod) => void;
   onUrlChange: (url: string) => void;
@@ -15,15 +14,6 @@ type UrlBarProps = {
 };
 
 export function UrlBar({ method, url, variables, sending, onMethodChange, onUrlChange, onSend, onCancel }: UrlBarProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
-  const tokens = tokenize(url, variables);
-
-  // Keep the highlighted mirror aligned with the real input while scrolling.
-  const syncScroll = () => {
-    if (mirrorRef.current && inputRef.current) mirrorRef.current.scrollLeft = inputRef.current.scrollLeft;
-  };
-
   return (
     <div className="urlbar">
       <select
@@ -40,40 +30,16 @@ export function UrlBar({ method, url, variables, sending, onMethodChange, onUrlC
         ))}
       </select>
 
-      <div className="url-field">
-        <div className="url-mirror" ref={mirrorRef} aria-hidden="true">
-          {tokens.map((token, index) =>
-            token.kind === 'variable' ? (
-              <span
-                key={index}
-                className={`url-var ${token.resolved === null ? 'missing' : ''}`}
-                title={token.resolved === null ? `${token.name} is not defined` : `${token.name} = ${token.resolved}`}
-              >
-                {token.text}
-              </span>
-            ) : (
-              <span key={index}>{token.text}</span>
-            ),
-          )}
-        </div>
-        <input
-          ref={inputRef}
-          value={url}
-          spellCheck={false}
-          autoComplete="off"
-          placeholder="https://api.example.com/resource"
-          onChange={(event) => onUrlChange(event.target.value)}
-          onScroll={syncScroll}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSend();
-            }
-          }}
-          aria-label="Request URL"
-          data-testid="input-request-url"
-        />
-      </div>
+      <TemplateField
+        value={url}
+        table={variables}
+        onChange={onUrlChange}
+        onSubmit={onSend}
+        placeholder="https://api.example.com/resource"
+        ariaLabel="Request URL"
+        testId="input-request-url"
+        className="url-field"
+      />
 
       {sending ? (
         <button className="btn" onClick={onCancel} data-testid="button-cancel-request">

@@ -3,16 +3,22 @@ import { dropLegacyState, migrateLegacyState } from '@/lib/migrate';
 import { createSeedState } from '@/lib/seed';
 import { defaultSettings } from '@/lib/settings';
 import { readState, writeState, STATE_VERSION } from '@/lib/storage';
-import { resolveVariables } from '@/lib/template';
+import { buildVariableTable, valuesOf } from '@/lib/template';
 import { reducer } from '@/state/reducer';
+import { folderChain } from '@/state/selectors';
 import type { Action } from '@/state/actions';
-import type { RequestRecord, ResponseRecord, WorkspaceState } from '@/types';
+import type { RequestRecord, ResponseRecord, VariableTable, WorkspaceState } from '@/types';
 
 type StoreValue = {
   state: WorkspaceState;
   dispatch: (action: Action) => void;
   activeRequest: RequestRecord | null;
+  /** Values only, for building the outgoing request. */
   variables: Record<string, string>;
+  /** Values plus where each came from, for the UI. */
+  variableTable: VariableTable;
+  /** Resolve in the context of any folder, not just the active request's. */
+  tableFor: (folderId: string | null) => VariableTable;
   responsesFor: (requestId: string) => ResponseRecord[];
 };
 
@@ -64,12 +70,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<StoreValue>(() => {
     const activeRequest = state.requests.find((request) => request.id === state.activeRequestId) ?? null;
-    const variables = resolveVariables(state.environments, state.activeEnvironmentId);
+    const environments = state.environments.filter(
+      (environment) => environment.workspaceId === state.activeWorkspaceId,
+    );
+    const tableFor = (folderId: string | null) =>
+      buildVariableTable(folderChain(state, folderId), environments, state.activeEnvironmentId);
+    const variableTable = tableFor(activeRequest?.folderId ?? null);
     return {
       state,
       dispatch,
       activeRequest,
-      variables,
+      variables: valuesOf(variableTable),
+      variableTable,
+      tableFor,
       responsesFor: (requestId: string) => state.responses.filter((response) => response.requestId === requestId),
     };
   }, [state]);

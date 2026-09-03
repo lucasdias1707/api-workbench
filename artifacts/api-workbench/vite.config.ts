@@ -27,6 +27,11 @@ if (!basePath) {
   );
 }
 
+// In the Replit preview the artifact router already maps /api to the API
+// server. Running the two dev servers directly needs an explicit proxy so the
+// request forwarder is reachable at the same relative path in both setups.
+const apiTarget = process.env.API_PROXY_TARGET ?? 'http://127.0.0.1:8080';
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -71,6 +76,12 @@ export default defineConfig({
     allowedHosts: true,
     fs: {
       strict: true,
+    },
+    proxy: {
+      '/api': {
+        target: apiTarget,
+        changeOrigin: true,
+      },
     },
   },
   preview: {

@@ -136,8 +136,29 @@ que é estrutura de repositório e não produto).
 O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
 à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow
 `.github/workflows/desktop.yml` compila também `.dmg` (Intel e Apple Silicon) e `.msi`/`.exe`,
-já que webview não cross-compila. O workflow só publica instaladores em Releases quando uma tag `v*` é enviada; execução manual
-pelo Actions builda as quatro plataformas e deixa os bundles como artefatos da run.
+já que webview não cross-compila. O workflow só publica instaladores em Releases quando há
+uma tag: uma tag `v*` enviada, ou uma run manual com `publish` marcado (a tag sai da versão
+em `tauri.conf.json`). Run manual sem `publish` builda as quatro plataformas e deixa os
+bundles como artefatos da run.
+
+### Assinatura (macOS e Windows)
+
+Os bundles não são assinados com um certificado pago, então o sistema não reconhece o
+publisher. No macOS o build usa **assinatura ad-hoc** (`APPLE_SIGNING_IDENTITY: '-'` no
+workflow) — isso não é cosmético: em Apple Silicon um `.app` arm64 *sem assinatura nenhuma*
+é rejeitado pelo Gatekeeper com a mensagem "está danificado e não pode ser aberto", que
+parece corrupção de download mas é falha de validação. Com ad-hoc a assinatura é válida e o
+primeiro run vira o aviso normal de "desenvolvedor não identificado", que dá para aceitar
+(botão direito → Abrir, ou `xattr -cr /Applications/Kavo.app`). O step `Verify macOS
+signature` roda `codesign -dv` e `codesign --verify` no bundle e deixa a prova no log.
+
+Para tirar o aviso de vez é preciso Apple Developer ID pago + notarização: `tauri-action`
+aceita `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,
+`APPLE_ID`, `APPLE_PASSWORD` e `APPLE_TEAM_ID` como secrets. Cuidado ao ligar: `APPLE_ID`
+e `APPLE_PASSWORD` definidos como string vazia fazem o tauri tentar notarizar e falhar, então
+eles precisam ser injetados só quando existirem, não com `${{ secrets.X }}` direto. No
+Windows o SmartScreen mostra "Windows protected your PC" pelo mesmo motivo (More info → Run
+anyway); remover exige um certificado de code signing.
 
 Para compilar localmente no Linux é preciso Rust e as libs do sistema:
 `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf`.

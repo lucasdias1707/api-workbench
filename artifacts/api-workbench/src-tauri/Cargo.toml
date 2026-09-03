@@ -1,6 +1,6 @@
 [package]
 name = "kavo"
-version = "0.1.0"
+version = "0.1.1"
 description = "Kavo — a fast, keyboard-driven HTTP client"
 authors = ["Kavo"]
 edition = "2021"

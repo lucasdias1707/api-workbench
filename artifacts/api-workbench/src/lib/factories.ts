@@ -22,7 +22,7 @@ export function createWorkspace(name: string): Workspace {
 }
 
 export function createFolder(workspaceId: string, name: string, parentId: string | null, sortIndex: number, color = '#6d8fff'): Folder {
-  return { id: createId('fld'), workspaceId, parentId, name, color, sortIndex };
+  return { id: createId('fld'), workspaceId, parentId, name, color, sortIndex, variables: [] };
 }
 
 export function createRequest(overrides: Partial<RequestRecord> & { workspaceId: string }): RequestRecord {
@@ -49,8 +49,17 @@ export function createRequest(overrides: Partial<RequestRecord> & { workspaceId:
   };
 }
 
-export function createEnvironment(workspaceId: string, name: string, isBase = false, variables: KeyValue[] = []): Environment {
-  return { id: createId('env'), workspaceId, name, isBase, variables };
+/** Palette offered when creating an environment, so each one reads differently. */
+export const ENVIRONMENT_COLORS = ['#8b93a1', '#57b981', '#d7ac4d', '#e0913f', '#e2645f', '#a97ad6', '#46b3b8'];
+
+export function createEnvironment(
+  workspaceId: string,
+  name: string,
+  isBase = false,
+  variables: KeyValue[] = [],
+  color = ENVIRONMENT_COLORS[0],
+): Environment {
+  return { id: createId('env'), workspaceId, name, isBase, color, variables };
 }
 
 /** Deep-enough copy so edits to a draft never mutate stored state. */

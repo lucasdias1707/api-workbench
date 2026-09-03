@@ -2,6 +2,7 @@ import { cloneRequest } from '@/lib/factories';
 import { createId } from '@/lib/id';
 import type { Action } from '@/state/actions';
 import type { RequestRecord, WorkspaceState } from '@/types';
+import { isDescendantFolder } from '@/state/selectors';
 
 /** Keep at most this many responses per request so history stays useful but bounded. */
 const MAX_RESPONSES_PER_REQUEST = 15;
@@ -95,13 +96,42 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
     case 'request/delete':
       return removeRequests(state, new Set([action.id]));
 
-    case 'request/move':
+    case 'request/move': {
+      const moving = state.requests.find((request) => request.id === action.id);
+      if (!moving) return state;
+
+      // Rebuild the destination's order with the dragged request inserted at
+      // the drop point, then renumber so sortIndex stays dense and stable.
+      const siblings = state.requests
+        .filter((request) => request.folderId === action.folderId && request.id !== action.id)
+        .sort((left, right) => left.sortIndex - right.sortIndex);
+      const at = action.beforeId ? siblings.findIndex((request) => request.id === action.beforeId) : -1;
+      const ordered = [...siblings];
+      ordered.splice(at === -1 ? ordered.length : at, 0, moving);
+
+      const order = new Map(ordered.map((request, index) => [request.id, index]));
       return {
         ...state,
-        requests: state.requests.map((request) =>
-          request.id === action.id ? touch(request, { folderId: action.folderId }) : request,
+        requests: state.requests.map((request) => {
+          const index = order.get(request.id);
+          if (index === undefined) return request;
+          return request.id === action.id
+            ? touch(request, { folderId: action.folderId, sortIndex: index })
+            : { ...request, sortIndex: index };
+        }),
+      };
+    }
+
+    case 'folder/move': {
+      // Refuse to drop a folder into its own subtree, which would detach it.
+      if (action.parentId && isDescendantFolder(state, action.parentId, action.id)) return state;
+      return {
+        ...state,
+        folders: state.folders.map((folder) =>
+          folder.id === action.id ? { ...folder, parentId: action.parentId } : folder,
         ),
       };
+    }
 
     case 'folder/create':
       return { ...state, folders: [...state.folders, action.folder] };
@@ -119,6 +149,58 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       );
       const next = removeRequests(state, doomedRequests);
       return { ...next, folders: next.folders.filter((folder) => !doomedFolders.has(folder.id)) };
+    }
+
+    case 'folder/variables':
+      return {
+        ...state,
+        folders: state.folders.map((folder) =>
+          folder.id === action.id ? { ...folder, variables: action.variables } : folder,
+        ),
+      };
+
+    case 'workspace/create':
+      return {
+        ...state,
+        workspaces: [...state.workspaces, action.workspace],
+        environments: [...state.environments, action.environment],
+        activeWorkspaceId: action.workspace.id,
+        activeEnvironmentId: null,
+        openTabIds: [],
+        activeRequestId: null,
+      };
+
+    case 'workspace/activate': {
+      if (action.id === state.activeWorkspaceId) return state;
+      // Tabs belong to the workspace they were opened from.
+      return { ...state, activeWorkspaceId: action.id, activeEnvironmentId: null, openTabIds: [], activeRequestId: null };
+    }
+
+    case 'workspace/rename':
+      return {
+        ...state,
+        workspaces: state.workspaces.map((workspace) =>
+          workspace.id === action.id ? { ...workspace, name: action.name } : workspace,
+        ),
+      };
+
+    case 'workspace/delete': {
+      // The last workspace stays: there is nowhere to send the user otherwise.
+      if (state.workspaces.length <= 1) return state;
+      const remaining = state.workspaces.filter((workspace) => workspace.id !== action.id);
+      const doomedRequests = new Set(
+        state.requests.filter((request) => request.workspaceId === action.id).map((request) => request.id),
+      );
+      const next = removeRequests(state, doomedRequests);
+      const activeWorkspaceId = state.activeWorkspaceId === action.id ? remaining[0].id : state.activeWorkspaceId;
+      return {
+        ...next,
+        workspaces: remaining,
+        folders: next.folders.filter((folder) => folder.workspaceId !== action.id),
+        environments: next.environments.filter((environment) => environment.workspaceId !== action.id),
+        activeWorkspaceId,
+        activeEnvironmentId: null,
+      };
     }
 
     case 'environment/activate':

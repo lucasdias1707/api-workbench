@@ -12,10 +12,12 @@ import {
   Terminal,
 } from 'lucide-react';
 import { CommandPalette, type Command } from '@/components/dialogs/CommandPalette';
+import { FolderVariablesDialog } from '@/components/dialogs/FolderVariablesDialog';
 import { EnvironmentDialog } from '@/components/dialogs/EnvironmentDialog';
 import { ImportCurlDialog } from '@/components/dialogs/ImportCurlDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { ShortcutsDialog } from '@/components/dialogs/ShortcutsDialog';
+import { EnvironmentPicker } from '@/components/layout/EnvironmentPicker';
 import { TabStrip } from '@/components/layout/TabStrip';
 import { RequestPane } from '@/components/request/RequestPane';
 import { ResponsePane } from '@/components/response/ResponsePane';
@@ -37,6 +39,7 @@ export function Workbench() {
   const { sending, send, cancel } = useSendRequest(proxyStatus);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [folderVariables, setFolderVariables] = useState<string | null>(null);
 
   useTheme(state.settings.theme);
 
@@ -101,8 +104,21 @@ export function Workbench() {
   ];
 
   return (
-    <div className="workbench" data-sidebar={sidebarVisible ? 'visible' : 'hidden'}>
-      <Sidebar onImportCurl={() => setOverlay('curl')} />
+    <div
+      className="workbench"
+      data-sidebar={sidebarVisible ? 'visible' : 'hidden'}
+      style={
+        {
+          '--json-key': state.settings.jsonTheme.key,
+          '--json-string': state.settings.jsonTheme.string,
+          '--json-number': state.settings.jsonTheme.number,
+          '--json-boolean': state.settings.jsonTheme.boolean,
+          '--json-null': state.settings.jsonTheme.null,
+          '--json-punct': state.settings.jsonTheme.punctuation,
+        } as React.CSSProperties
+      }
+    >
+      <Sidebar onImportCurl={() => setOverlay('curl')} onFolderVariables={setFolderVariables} />
 
       <main className="main">
         <div className="topbar">
@@ -119,20 +135,7 @@ export function Workbench() {
           <TabStrip />
 
           <div className="topbar-actions">
-            <select
-              className="select select-bare"
-              value={state.activeEnvironmentId ?? ''}
-              onChange={(event) => dispatch({ type: 'environment/activate', id: event.target.value || null })}
-              aria-label="Active environment"
-              data-testid="select-environment"
-            >
-              <option value="">Base only</option>
-              {environments.map((environment) => (
-                <option key={environment.id} value={environment.id}>
-                  {environment.name}
-                </option>
-              ))}
-            </select>
+            <EnvironmentPicker onManage={() => setOverlay('environments')} />
             <button
               className="icon-btn"
               onClick={() => setOverlay('environments')}
@@ -205,6 +208,9 @@ export function Workbench() {
       {overlay === 'settings' ? <SettingsDialog onClose={() => setOverlay(null)} proxyStatus={proxyStatus} /> : null}
       {overlay === 'curl' ? <ImportCurlDialog onClose={() => setOverlay(null)} /> : null}
       {overlay === 'shortcuts' ? <ShortcutsDialog onClose={() => setOverlay(null)} /> : null}
+      {folderVariables ? (
+        <FolderVariablesDialog folderId={folderVariables} onClose={() => setFolderVariables(null)} />
+      ) : null}
     </div>
   );
 }

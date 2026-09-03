@@ -1,4 +1,4 @@
-import type { Environment, Folder, RequestRecord, ResponseRecord, Settings, WorkspaceState } from '@/types';
+import type { Environment, Folder, KeyValue, RequestRecord, ResponseRecord, Settings, Workspace, WorkspaceState } from '@/types';
 
 export type Action =
   | { type: 'state/replace'; state: WorkspaceState }
@@ -9,10 +9,16 @@ export type Action =
   | { type: 'request/create'; request: RequestRecord }
   | { type: 'request/duplicate'; id: string }
   | { type: 'request/delete'; id: string }
-  | { type: 'request/move'; id: string; folderId: string | null }
+  | { type: 'request/move'; id: string; folderId: string | null; beforeId?: string | null }
+  | { type: 'folder/move'; id: string; parentId: string | null }
   | { type: 'folder/create'; folder: Folder }
   | { type: 'folder/rename'; id: string; name: string }
   | { type: 'folder/delete'; id: string }
+  | { type: 'folder/variables'; id: string; variables: KeyValue[] }
+  | { type: 'workspace/create'; workspace: Workspace; environment: Environment }
+  | { type: 'workspace/activate'; id: string }
+  | { type: 'workspace/rename'; id: string; name: string }
+  | { type: 'workspace/delete'; id: string }
   | { type: 'environment/activate'; id: string | null }
   | { type: 'environment/create'; environment: Environment }
   | { type: 'environment/update'; id: string; patch: Partial<Environment> }

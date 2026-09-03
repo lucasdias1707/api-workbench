@@ -48,14 +48,29 @@ export function countRequests(nodes: TreeNode[]): number {
   return nodes.reduce((total, node) => total + (node.kind === 'request' ? 1 : countRequests(node.children)), 0);
 }
 
-/** Human-readable path of a request, e.g. `Playground / Inspect`. */
-export function folderPath(state: WorkspaceState, folderId: string | null): string[] {
-  const path: string[] = [];
+/** Folders from the given one outwards to the root, nearest first. */
+export function folderChain(state: WorkspaceState, folderId: string | null): Folder[] {
+  const chain: Folder[] = [];
+  const seen = new Set<string>();
   let current = state.folders.find((folder) => folder.id === folderId);
-  while (current) {
-    path.unshift(current.name);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    chain.push(current);
     const parentId: string | null = current.parentId;
     current = parentId ? state.folders.find((folder) => folder.id === parentId) : undefined;
   }
-  return path;
+  return chain;
+}
+
+/** Human-readable path of a request, e.g. `Playground / Inspect`. */
+export function folderPath(state: WorkspaceState, folderId: string | null): string[] {
+  return folderChain(state, folderId)
+    .map((folder) => folder.name)
+    .reverse();
+}
+
+/** True when `candidateId` sits inside `folderId`, so a move cannot orphan a subtree. */
+export function isDescendantFolder(state: WorkspaceState, candidateId: string, folderId: string): boolean {
+  if (candidateId === folderId) return true;
+  return folderChain(state, candidateId).some((folder) => folder.id === folderId);
 }

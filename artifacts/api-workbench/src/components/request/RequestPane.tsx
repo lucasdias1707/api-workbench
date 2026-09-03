@@ -29,7 +29,7 @@ type RequestPaneProps = {
 };
 
 export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneProps) {
-  const { state, dispatch, variables } = useWorkspace();
+  const { state, dispatch, variables, variableTable } = useWorkspace();
   const { toast } = useToast();
   const [tab, setTab] = useState<RequestTab>('params');
 
@@ -62,7 +62,7 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
       <UrlBar
         method={request.method}
         url={request.url}
-        variables={variables}
+        variables={variableTable}
         sending={sending}
         onMethodChange={(method: HttpMethod) => patch({ method })}
         onUrlChange={(url) => patch({ url })}

@@ -3,8 +3,9 @@ import { Download, Upload } from 'lucide-react';
 import { Dialog } from '@/components/common/Dialog';
 import { useToast } from '@/components/common/Toaster';
 import { createSeedState } from '@/lib/seed';
+import { JSON_THEME_PRESETS } from '@/lib/settings';
 import { useWorkspace } from '@/state/workspace-store';
-import type { PaneLayout, SendMode, ThemeName, WorkspaceState } from '@/types';
+import type { JsonTheme, PaneLayout, SendMode, ThemeName, WorkspaceState } from '@/types';
 import type { ProxyStatus } from '@/hooks/use-proxy-health';
 
 const PROXY_COPY: Record<ProxyStatus, string> = {
@@ -12,6 +13,15 @@ const PROXY_COPY: Record<ProxyStatus, string> = {
   available: 'The companion server is running, so requests can bypass browser CORS like a desktop client.',
   unavailable: 'The companion server is not reachable, so requests are sent straight from the browser and are subject to CORS.',
 };
+
+const JSON_COLOR_FIELDS: Array<{ field: keyof JsonTheme; label: string; sample: string }> = [
+  { field: 'key', label: 'Keys', sample: '"name"' },
+  { field: 'string', label: 'Strings', sample: '"ditto"' },
+  { field: 'number', label: 'Numbers', sample: '132' },
+  { field: 'boolean', label: 'Booleans', sample: 'true' },
+  { field: 'null', label: 'Null', sample: 'null' },
+  { field: 'punctuation', label: 'Punctuation', sample: '{ } [ ] ,' },
+];
 
 export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; proxyStatus: ProxyStatus }) {
   const { state, dispatch } = useWorkspace();
@@ -129,6 +139,55 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
           />
           Keep response bodies between reloads
         </label>
+
+        <div>
+          <div className="section-label">
+            JSON colours
+            <span className="spacer" />
+            <select
+              className="select"
+              value=""
+              onChange={(event) => {
+                const preset = JSON_THEME_PRESETS[event.target.value];
+                if (preset) dispatch({ type: 'settings/update', patch: { jsonTheme: { ...preset } } });
+              }}
+              aria-label="Colour preset"
+              data-testid="select-json-preset"
+            >
+              <option value="">Presets…</option>
+              {Object.keys(JSON_THEME_PRESETS).map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="color-rows">
+            {JSON_COLOR_FIELDS.map(({ field, label, sample }) => (
+              <div className="color-row" key={field}>
+                <label htmlFor={`json-color-${field}`}>{label}</label>
+                <input
+                  id={`json-color-${field}`}
+                  type="color"
+                  value={settings.jsonTheme[field]}
+                  onChange={(event) =>
+                    dispatch({
+                      type: 'settings/update',
+                      patch: { jsonTheme: { ...settings.jsonTheme, [field]: event.target.value } },
+                    })
+                  }
+                  data-testid={`input-json-color-${field}`}
+                />
+                <span className="color-sample" style={{ color: settings.jsonTheme[field] }}>
+                  {sample}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="hint" style={{ marginTop: 8 }}>
+            Applies to the Pretty tab of the response viewer.
+          </p>
+        </div>
 
         <div>
           <div className="section-label">Workspace data</div>

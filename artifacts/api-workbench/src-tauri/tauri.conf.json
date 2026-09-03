@@ -4,10 +4,9 @@
   "version": "0.1.0",
   "identifier": "dev.apiworkbench.desktop",
   "build": {
-    "beforeDevCommand": "pnpm run dev:tauri",
-    "devUrl": "http://localhost:21728",
-    "beforeBuildCommand": "pnpm run build:tauri",
-    "frontendDist": "../dist/public"
+    "beforeBuildCommand": "pnpm --filter ...@workspace/api-workbench build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173"
   },
   "app": {
     "windows": [

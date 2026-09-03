@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "API Workbench",
+  "version": "0.1.0",
+  "identifier": "dev.apiworkbench.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm run dev:tauri",
+    "devUrl": "http://localhost:21728",
+    "beforeBuildCommand": "pnpm run build:tauri",
+    "frontendDist": "../dist/public"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "API Workbench",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "theme": null
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "HTTP client",
+    "longDescription": "Compose, organise and send HTTP requests with collections, environments and a readable response viewer.",
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0"
+        ]
+      }
+    }
+  }
+}

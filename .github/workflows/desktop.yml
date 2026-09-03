@@ -1,60 +1,102 @@
-name: Desktop Build
+name: Desktop build
 
+# Installers are published only when a version tag is pushed. A manual run
+# builds the same four targets and leaves the bundles as run artifacts, so the
+# pipeline can be exercised without cutting a release.
+#
+# A webview app does not cross-compile, so each target builds on its own runner.
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
-  build-tauri:
+  build:
     permissions:
+      # tauri-action creates the release through the API on a tag build.
       contents: write
+
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            args: ''
-          - os: windows-latest
-            args: ''
-          - os: macos-latest
-            args: '--target aarch64-apple-darwin'
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            name: macos-arm64
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            name: macos-intel
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: linux-x64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: windows-x64
 
-    runs-on: ${{ matrix.os }}
-
+    runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'pnpm'
-
-      - name: Install Rust Stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Linux Dependencies
-        if: matrix.os == 'ubuntu-22.04'
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
-      - name: Build Desktop App
-        uses: tauri-apps/tauri-action@v0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: artifacts/api-workbench/src-tauri -> target
+
+      # Frozen is safe here because rollup, lightningcss, @tailwindcss/oxide and
+      # esbuild have their per-platform binaries declared as direct optional
+      # dependencies, so the lockfile carries all four platforms and each runner
+      # installs the one that matches it. Without that, a lockfile resolved on
+      # Linux leaves macOS and Windows with a rollup that cannot load itself.
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: artifacts/api-workbench
-          args: ${{ matrix.args }}
+          args: --target ${{ matrix.target }}
+          # Empty on a manual run, which makes tauri-action build without
+          # touching releases. On a tag, __VERSION__ comes from tauri.conf.json,
+          # so the tag and the installers always agree.
+          tagName: ${{ github.ref_type == 'tag' && 'v__VERSION__' || '' }}
+          releaseName: Kavo v__VERSION__
+          releaseBody: |
+            Kavo — a fast, keyboard-driven HTTP client.
+
+            Requests are made natively on the desktop, so there is no CORS
+            restriction and hosts on your own network are reachable.
+
+            | Platform | File |
+            | --- | --- |
+            | macOS (Apple Silicon) | `.dmg` |
+            | macOS (Intel) | `.dmg` |
+            | Windows | `.msi` or `.exe` |
+            | Linux | `.AppImage`, `.deb` or `.rpm` |
+          releaseDraft: false
+          prerelease: false
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: kavo-${{ matrix.name }}
+          path: artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
+          if-no-files-found: warn
+          retention-days: 14

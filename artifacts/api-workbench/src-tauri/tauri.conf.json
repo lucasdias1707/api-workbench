@@ -1,17 +1,18 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "API Workbench",
+  "productName": "Kavo",
   "version": "0.1.0",
-  "identifier": "dev.apiworkbench.desktop",
+  "identifier": "dev.kavo.app",
   "build": {
-    "beforeBuildCommand": "pnpm --filter ...@workspace/api-workbench build",
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173"
+    "beforeDevCommand": "pnpm run dev:tauri",
+    "devUrl": "http://localhost:21728",
+    "beforeBuildCommand": "pnpm run build:tauri",
+    "frontendDist": "../dist/public"
   },
   "app": {
     "windows": [
       {
-        "title": "API Workbench",
+        "title": "Kavo",
         "width": 1280,
         "height": 820,
         "minWidth": 720,
@@ -35,15 +36,7 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "HTTP client",
-    "longDescription": "Compose, organise and send HTTP requests with collections, environments and a readable response viewer.",
-    "linux": {
-      "deb": {
-        "depends": [
-          "libwebkit2gtk-4.1-0",
-          "libgtk-3-0"
-        ]
-      }
-    }
+    "shortDescription": "Kavo — HTTP client",
+    "longDescription": "Kavo composes, organises and sends HTTP requests, with collections, environments and a readable response viewer."
   }
 }

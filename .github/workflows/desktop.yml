@@ -58,7 +58,8 @@ jobs:
         with:
           workspaces: artifacts/api-workbench/src-tauri -> target
 
-      - run: pnpm install --frozen-lockfile
+      # Força o pnpm a baixar as dependências nativas da plataforma atual do runner
+      - run: pnpm install --frozen-lockfile --supported-architectures current
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -68,14 +69,14 @@ jobs:
           args: --target ${{ matrix.target }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: API Workbench ${{ github.ref_name }}
-          releaseDraft: true
+          releaseDraft: ${{ inputs.release || github.ref_type == 'tag' }}
           prerelease: false
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
           name: api-workbench-${{ matrix.name }}
-          # .dmg/.app on macOS, .deb/.rpm/.AppImage on Linux, .msi/.exe on Windows
+          # .dmg/.app no macOS, .deb/.rpm/.AppImage no Linux, .msi/.exe no Windows
           path: |
             artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           if-no-files-found: warn

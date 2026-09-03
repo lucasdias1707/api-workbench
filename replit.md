@@ -19,6 +19,7 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 | Variável | Onde | Para quê |
 | --- | --- | --- |
 | `PORT` | ambos | porta do serviço (obrigatória) |
+| `HOST` | servidor | interface de escuta; padrão `0.0.0.0`. Use `127.0.0.1` atrás de um reverse proxy |
 | `BASE_PATH` | frontend | base do Vite (obrigatória) |
 | `API_PROXY_TARGET` | frontend (dev) | destino do proxy `/api`; padrão `http://127.0.0.1:8080` |
 | `VITE_API_BASE_URL` | frontend | base da API quando ela não é same-origin; padrão `/api` |
@@ -108,6 +109,13 @@ _Nenhuma preferência persistente registrada._
   `lib/api-zod/src/generated` e `lib/api-client-react/src/generated` são gerados.
 - `artifacts/api-workbench/src/components/ui` é o scaffold do shadcn/ui e não é usado pelo app,
   que tem seu próprio sistema visual em `index.css`.
+
+## Deploy
+
+- `deploy/` traz um runbook para VM (Oracle Cloud Always Free), um unit do systemd e um
+  Caddyfile. Leia a seção de segurança antes de expor: o `/api/proxy` encaminha qualquer
+  requisição e não tem autenticação própria, então precisa de um gate na frente do site
+  inteiro — senão vira proxy HTTP aberto.
 
 ## Pointers
 

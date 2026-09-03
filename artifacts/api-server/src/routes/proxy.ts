@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod/v4";
 import { guardTargetUrl } from "../lib/net-guard";
+import { checkProxyAccess, readAccessConfig, PROXY_AUTH_HEADER } from "../lib/proxy-access";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -80,6 +81,12 @@ function buildBody(body: ProxyBody): UpstreamBody {
  * desktop client.
  */
 router.post("/proxy", async (req, res) => {
+  const access = checkProxyAccess(readAccessConfig(), req.get(PROXY_AUTH_HEADER));
+  if (!access.allowed) {
+    res.status(access.status).json({ error: { code: access.code, message: access.message } });
+    return;
+  }
+
   const parsed = ProxyRequest.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({

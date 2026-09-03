@@ -25,6 +25,7 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 | `VITE_API_BASE_URL` | frontend | base da API quando ela não é same-origin; padrão `/api` |
 | `ALLOWED_ORIGINS` | servidor | lista separada por vírgula de origens permitidas no CORS |
 | `PROXY_ALLOW_PRIVATE_NETWORK` | servidor | libera destinos em rede privada; padrão: ligado fora de produção |
+| `PROXY_SHARED_SECRET` | servidor | exige o header `X-Proxy-Auth`; obrigatório em produção com rede privada liberada |
 | `DATABASE_URL` | servidor | conexão Postgres (usada por `@workspace/db`) |
 | `LOG_LEVEL` | servidor | nível do Pino; padrão `info` |
 

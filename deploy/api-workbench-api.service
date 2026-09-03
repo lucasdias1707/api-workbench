@@ -19,9 +19,15 @@ Environment=HOST=127.0.0.1
 Environment=PORT=8080
 Environment=NODE_ENV=production
 Environment=LOG_LEVEL=info
-# Leave PROXY_ALLOW_PRIVATE_NETWORK unset. In production the guard already
-# refuses private ranges, which is what stops someone from reaching your VCN
-# or the OCI instance metadata service at 169.254.169.254 through the proxy.
+
+# Holds PROXY_ALLOW_PRIVATE_NETWORK and PROXY_SHARED_SECRET. Keep it 0600 and
+# owned by root; see api-workbench.env.example.
+#
+# Reaching private addresses is opt-in. With it on, the server refuses to serve
+# the forwarder at all unless PROXY_SHARED_SECRET is also set, so there is no
+# configuration where it silently exposes the network around it. The OCI
+# instance metadata service at 169.254.169.254 stays blocked either way.
+EnvironmentFile=/etc/api-workbench.env
 
 # The service only needs to make outbound HTTP; deny it everything else.
 NoNewPrivileges=true

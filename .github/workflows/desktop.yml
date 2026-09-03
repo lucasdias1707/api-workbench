@@ -1,14 +1,22 @@
 name: Desktop build
 
-# Installers are published only when a version tag is pushed. A manual run
-# builds the same four targets and leaves the bundles as run artifacts, so the
-# pipeline can be exercised without cutting a release.
+# Installers are published only for a version tag: either a pushed `v*` tag or
+# a manual run with `publish` ticked, which cuts the tag from the version in
+# tauri.conf.json. A manual run without it builds the same four targets and
+# leaves the bundles as run artifacts, so the pipeline can be exercised without
+# cutting a release.
 #
 # A webview app does not cross-compile, so each target builds on its own runner.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish installers to a release. The tag comes from the version in tauri.conf.json.'
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   build:
@@ -70,13 +78,20 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ad-hoc code signature ("-") for the macOS bundles. Without any
+          # signature at all, an arm64 app fails Gatekeeper's check outright and
+          # macOS reports it as "damaged"; ad-hoc makes the signature valid, so
+          # the first run is an "unidentified developer" prompt the user can
+          # accept. Removing the prompt needs a paid Developer ID plus
+          # notarization -- see the Desktop section of replit.md.
+          APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
         with:
           projectPath: artifacts/api-workbench
           args: --target ${{ matrix.target }}
-          # Empty on a manual run, which makes tauri-action build without
-          # touching releases. On a tag, __VERSION__ comes from tauri.conf.json,
-          # so the tag and the installers always agree.
-          tagName: ${{ github.ref_type == 'tag' && 'v__VERSION__' || '' }}
+          # Empty on a manual run with `publish` off, which makes tauri-action
+          # build without touching releases. Otherwise __VERSION__ comes from
+          # tauri.conf.json, so the tag and the installers always agree.
+          tagName: ${{ (github.ref_type == 'tag' || inputs.publish) && 'v__VERSION__' || '' }}
           releaseName: Kavo v__VERSION__
           releaseBody: |
             Kavo — a fast, keyboard-driven HTTP client.
@@ -86,12 +101,38 @@ jobs:
 
             | Platform | File |
             | --- | --- |
-            | macOS (Apple Silicon) | `.dmg` |
-            | macOS (Intel) | `.dmg` |
+            | macOS (Apple Silicon) | `Kavo_*_aarch64.dmg` |
+            | macOS (Intel) | `Kavo_*_x64.dmg` |
             | Windows | `.msi` or `.exe` |
             | Linux | `.AppImage`, `.deb` or `.rpm` |
+
+            ### First run on macOS
+
+            The bundles are signed ad-hoc, not with a paid Apple Developer ID,
+            so Gatekeeper does not recognise the publisher. Open the `.dmg`,
+            drag Kavo to Applications, then either right-click the app and
+            choose **Open** (once), or run:
+
+            ```sh
+            xattr -cr /Applications/Kavo.app
+            ```
+
+            ### First run on Windows
+
+            SmartScreen shows "Windows protected your PC" for the same reason:
+            choose **More info -> Run anyway**.
           releaseDraft: false
           prerelease: false
+
+      # Proof in the log that the bundle carries a valid signature, which is
+      # what separates "unidentified developer" from "damaged".
+      - name: Verify macOS signature
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          app=$(find "artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/macos" -maxdepth 1 -name '*.app' | head -1)
+          echo "Bundle: $app"
+          codesign -dv --verbose=4 "$app"
+          codesign --verify --verbose=2 "$app"
 
       - name: Upload bundles
         uses: actions/upload-artifact@v4

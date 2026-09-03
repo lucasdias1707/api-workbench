@@ -158,7 +158,7 @@ export type ResponseRecord = {
   size: number;
   durationMs: number;
   sentAt: string;
-  via: 'browser' | 'proxy';
+  via: 'browser' | 'proxy' | 'desktop';
   error?: string;
 };
 

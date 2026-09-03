@@ -11,6 +11,8 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 - `pnpm run test` — apenas os testes (Vitest)
 - `pnpm run typecheck` — typecheck completo
 - `pnpm run build` — typecheck + build de todos os pacotes
+- `pnpm --filter @workspace/api-workbench run desktop:dev` — roda o app desktop (Tauri)
+- `pnpm --filter @workspace/api-workbench run desktop:build` — gera o executável e os instaladores
 - `pnpm --filter @workspace/api-spec run codegen` — regenera hooks e schemas Zod a partir do OpenAPI
 - `pnpm --filter @workspace/db run push` — aplica mudanças de schema (apenas dev)
 
@@ -55,6 +57,12 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 - `components/sidebar|request|response|dialogs|layout|common` — UI por área
 - `index.css` — design tokens (tema escuro e claro) e todos os componentes visuais
 
+### Desktop (`artifacts/api-workbench/src-tauri`)
+
+- `tauri.conf.json` — janela, bundle e comandos de build
+- `src/lib.rs` — registra o plugin HTTP, que faz as requisições em Rust
+- `capabilities/default.json` — escopo do que a webview pode chamar
+
 ### Servidor (`artifacts/api-server/src`)
 
 - `routes/proxy.ts` — `POST /api/proxy`, encaminha uma requisição e devolve o resultado bruto
@@ -65,9 +73,10 @@ requisições com foco em teclado, tema escuro e leitura clara da resposta.
 
 - **Local-first.** Coleções, pastas, ambientes, abas e histórico vivem no navegador. Não há
   conta nem sincronização; `Settings → Export JSON` é o caminho de backup.
-- **Dois modos de envio.** O navegador não alcança APIs sem CORS, coisa que um cliente desktop
-  como o Yaak nunca enfrenta. O servidor de apoio expõe `/api/proxy` e o modo `auto` o usa
-  quando ele responde ao health check, caindo para `fetch` direto quando não responde.
+- **Três transportes, escolhidos por `chooseTransport`.** No app desktop as requisições saem
+  do Rust: sem CORS, sem preflight, e `localhost` e a rede local ficam acessíveis — é o que o
+  Yaak faz. Na web, o servidor de apoio expõe `/api/proxy` e o modo `auto` o usa quando ele
+  responde ao health check, caindo para `fetch` direto quando não responde.
 - **O proxy é um vetor de SSRF**, então `lib/net-guard.ts` resolve o hostname antes de sair:
   esquemas diferentes de http/https são recusados, endpoints de metadados de nuvem são sempre
   bloqueados e endereços privados só passam com `PROXY_ALLOW_PRIVATE_NETWORK`.
@@ -118,6 +127,16 @@ _Nenhuma preferência persistente registrada._
   `lib/api-zod/src/generated` e `lib/api-client-react/src/generated` são gerados.
 - `artifacts/api-workbench/src/components/ui` é o scaffold do shadcn/ui e não é usado pelo app,
   que tem seu próprio sistema visual em `index.css`.
+
+## Desktop
+
+O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
+à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow
+`.github/workflows/desktop.yml` compila também `.dmg` (Intel e Apple Silicon) e `.msi`/`.exe`,
+já que webview não cross-compila. Dispare por tag `v*` ou manualmente pelo Actions.
+
+Para compilar localmente no Linux é preciso Rust e as libs do sistema:
+`libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf`.
 
 ## Deploy
 

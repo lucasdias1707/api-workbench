@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { Dialog } from '@/components/common/Dialog';
 import { useToast } from '@/components/common/Toaster';
+import { isDesktop } from '@/lib/http';
 import { createSeedState } from '@/lib/seed';
 import { JSON_THEME_PRESETS } from '@/lib/settings';
 import { useWorkspace } from '@/state/workspace-store';
@@ -96,11 +97,15 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
             onChange={(event) => dispatch({ type: 'settings/update', patch: { sendMode: event.target.value as SendMode } })}
             data-testid="select-send-mode"
           >
-            <option value="auto">Auto — server when available</option>
+            <option value="auto">{isDesktop() ? 'Auto — native (recommended)' : 'Auto — server when available'}</option>
             <option value="proxy">Companion server only</option>
             <option value="browser">Browser only</option>
           </select>
-          <span className="hint">{PROXY_COPY[proxyStatus]}</span>
+          <span className="hint">
+            {isDesktop()
+              ? 'Running as a desktop app: requests are made natively, so CORS does not apply and private hosts are reachable. The companion server is not needed here.'
+              : PROXY_COPY[proxyStatus]}
+          </span>
         </label>
 
         <label className="stack" style={{ gap: 6 }}>

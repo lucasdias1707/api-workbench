@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { buildUrl, prepareRequest } from '@/lib/http';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildUrl, chooseTransport, isDesktop, prepareRequest } from '@/lib/http';
 import { createRequest, emptyAuth, row } from '@/lib/factories';
 import type { RequestRecord } from '@/types';
 
@@ -109,5 +109,51 @@ describe('prepareRequest', () => {
     expect(() =>
       prepareRequest(make({ method: 'POST', bodyType: 'graphql', graphql: { query: '{}', variables: 'nope' } }), variables),
     ).toThrow(/not valid JSON/);
+  });
+});
+
+describe('chooseTransport', () => {
+  const web = { desktop: false, proxyAvailable: false };
+  const webWithProxy = { desktop: false, proxyAvailable: true };
+  const desktop = { desktop: true, proxyAvailable: false };
+
+  it('prefers the desktop shell in auto mode, since it has no CORS limit at all', () => {
+    expect(chooseTransport('auto', desktop)).toBe('desktop');
+    expect(chooseTransport('auto', { desktop: true, proxyAvailable: true })).toBe('desktop');
+  });
+
+  it('falls back to the companion server on the web when it is up', () => {
+    expect(chooseTransport('auto', webWithProxy)).toBe('proxy');
+  });
+
+  it('uses the browser when nothing else is available', () => {
+    expect(chooseTransport('auto', web)).toBe('browser');
+  });
+
+  it('honours an explicit choice even on the desktop', () => {
+    expect(chooseTransport('browser', desktop)).toBe('browser');
+    expect(chooseTransport('proxy', desktop)).toBe('proxy');
+  });
+
+  it('honours an explicit proxy choice even when the health check failed', () => {
+    // The user asked for it by name; failing loudly beats silently going direct.
+    expect(chooseTransport('proxy', web)).toBe('proxy');
+  });
+});
+
+describe('isDesktop', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'window');
+  });
+
+  it('is false in a plain browser or in node', () => {
+    expect(isDesktop()).toBe(false);
+    Object.defineProperty(globalThis, 'window', { value: {}, configurable: true });
+    expect(isDesktop()).toBe(false);
+  });
+
+  it('is true once the Tauri shell has injected its bridge', () => {
+    Object.defineProperty(globalThis, 'window', { value: { __TAURI_INTERNALS__: {} }, configurable: true });
+    expect(isDesktop()).toBe(true);
   });
 });

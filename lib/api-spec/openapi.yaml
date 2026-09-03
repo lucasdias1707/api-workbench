@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: proxy
+    description: Outbound request forwarding
 paths:
   /healthz:
     get:
@@ -24,8 +26,128 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /proxy:
+    post:
+      operationId: proxyRequest
+      tags: [proxy]
+      summary: Forward an HTTP request
+      description: >-
+        Performs an HTTP request on the caller's behalf and returns the raw
+        result. This lets a browser client reach endpoints that do not send CORS
+        headers. Targets that resolve to private addresses are rejected unless
+        PROXY_ALLOW_PRIVATE_NETWORK is enabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProxyRequest"
+      responses:
+        "200":
+          description: The upstream responded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyResponse"
+        "400":
+          description: The request was malformed or the target is blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyError"
+        "502":
+          description: The upstream could not be reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyError"
+        "504":
+          description: The upstream timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProxyError"
 components:
   schemas:
+    HeaderPair:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required: [key, value]
+    ProxyPayload:
+      type: object
+      description: >-
+        Payload to send upstream. `type` selects the shape: none, text (with an
+        optional contentType), form (URL encoded) or multipart.
+      properties:
+        type:
+          type: string
+          enum: [none, text, form, multipart]
+        text:
+          type: string
+        contentType:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeaderPair"
+      required: [type]
+    ProxyRequest:
+      type: object
+      properties:
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS]
+        url:
+          type: string
+        headers:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeaderPair"
+        body:
+          $ref: "#/components/schemas/ProxyPayload"
+        timeoutMs:
+          type: number
+        followRedirects:
+          type: boolean
+      required: [method, url]
+    ProxyResponse:
+      type: object
+      properties:
+        status:
+          type: number
+        statusText:
+          type: string
+        headers:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeaderPair"
+        body:
+          type: string
+        truncated:
+          type: boolean
+        size:
+          type: number
+        durationMs:
+          type: number
+        finalUrl:
+          type: string
+      required: [status, statusText, headers, body, truncated, size, durationMs, finalUrl]
+    ProxyError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+          required: [code, message]
+      required: [error]
     HealthStatus:
       type: object
       properties:

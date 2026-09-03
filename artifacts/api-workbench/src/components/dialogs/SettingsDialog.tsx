@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, Zap } from 'lucide-react';
 import { Dialog } from '@/components/common/Dialog';
 import { useToast } from '@/components/common/Toaster';
 import { isDesktop } from '@/lib/http';
@@ -14,6 +14,9 @@ const PROXY_COPY: Record<ProxyStatus, string> = {
   available: 'The companion server is running, so requests can bypass browser CORS like a desktop client.',
   unavailable: 'The companion server is not reachable, so requests are sent straight from the browser and are subject to CORS.',
 };
+
+/** Kept in step with src-tauri/tauri.conf.json, which names the installers. */
+const APP_VERSION = '0.1.0';
 
 const JSON_COLOR_FIELDS: Array<{ field: keyof JsonTheme; label: string; sample: string }> = [
   { field: 'key', label: 'Keys', sample: '"name"' },
@@ -45,7 +48,7 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
     try {
       const parsed = JSON.parse(await file.text()) as WorkspaceState;
       if (!Array.isArray(parsed.requests) || !Array.isArray(parsed.environments)) {
-        throw new Error('That file is not an API Workbench export.');
+        throw new Error('That file is not a Kavo export.');
       }
       dispatch({ type: 'state/replace', state: { ...parsed, responses: parsed.responses ?? [] } });
       toast({ title: 'Workspace imported', description: `${parsed.requests.length} requests loaded.`, kind: 'success' });
@@ -230,6 +233,16 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
             Everything is stored in this browser only. Export before clearing site data, and keep real secrets in an
             environment you do not share.
           </p>
+        </div>
+
+        <div className="about-line">
+          <span className="brand-mark" style={{ width: 18, height: 18 }}>
+            <Zap size={11} strokeWidth={2.6} />
+          </span>
+          <strong>Kavo</strong>
+          <span className="mono">{APP_VERSION}</span>
+          <span className="spacer" />
+          <span>{isDesktop() ? 'desktop' : 'web'}</span>
         </div>
       </div>
     </Dialog>

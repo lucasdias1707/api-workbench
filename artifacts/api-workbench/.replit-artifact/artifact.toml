@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "API Workbench"
+title = "Kavo"
 description = "Um cliente desktop moderno para criar, organizar e testar requisições HTTP com coleções, ambientes, histórico e uma visualização clara das respostas."
 version = "1.0.0"
 id = "artifacts/api-workbench"

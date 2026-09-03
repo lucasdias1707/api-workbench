@@ -1,13 +1,13 @@
 [package]
-name = "api-workbench"
+name = "kavo"
 version = "0.1.0"
-description = "A fast, keyboard-driven HTTP client"
-authors = ["API Workbench"]
+description = "Kavo — a fast, keyboard-driven HTTP client"
+authors = ["Kavo"]
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "api_workbench_lib"
+name = "kavo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

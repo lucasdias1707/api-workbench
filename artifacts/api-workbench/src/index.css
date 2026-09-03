@@ -962,6 +962,18 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
   background: var(--bg-code);
 }
 
+.about-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.about-line strong { color: var(--text-strong); font-weight: 600; }
+.about-line .spacer { flex: 1; }
+
 /* ==========================================================================
    Overlays
    ========================================================================== */

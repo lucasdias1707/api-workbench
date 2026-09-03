@@ -1,4 +1,4 @@
-# API Workbench
+# Kavo
 
 Um cliente HTTP no estilo desktop — inspirado no Yaak — para compor, organizar e enviar
 requisições com foco em teclado, tema escuro e leitura clara da resposta.
@@ -130,10 +130,14 @@ _Nenhuma preferência persistente registrada._
 
 ## Desktop
 
+O app se chama **Kavo** (os pacotes do workspace seguem com o nome `api-workbench`,
+que é estrutura de repositório e não produto).
+
 O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
 à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow
 `.github/workflows/desktop.yml` compila também `.dmg` (Intel e Apple Silicon) e `.msi`/`.exe`,
-já que webview não cross-compila. Dispare por tag `v*` ou manualmente pelo Actions.
+já que webview não cross-compila. O workflow só publica instaladores em Releases quando uma tag `v*` é enviada; execução manual
+pelo Actions builda as quatro plataformas e deixa os bundles como artefatos da run.
 
 Para compilar localmente no Linux é preciso Rust e as libs do sistema:
 `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf`.

@@ -120,6 +120,45 @@ opções são:
   arquivo — um download que não passa por navegador não recebe o carimbo e não dispara o
   Gatekeeper. O app continua sem certificado; quem instala confia em você do mesmo jeito.
 
+## Vindo do Postman
+
+`Import Postman`, na barra lateral, lê uma **coleção (v2.1)** ou um **environment** exportados
+do Postman — por arquivo ou colando o JSON.
+
+A coleção vira uma pasta, e é ela que guarda as variáveis, a auth e os scripts que estavam no
+nível da coleção. Assim tudo dentro continua herdando como herdava lá: uma request sem bloco
+de auth fica em "Inherit from parent", uma que definia a sua mantém a sua.
+
+Esquemas de auth que não existem aqui (OAuth, AWS, NTLM) viram "herdar" — nada é enviado, e a
+aba Auth diz isso, em vez de fingir que o fluxo veio junto.
+
+## Scripts
+
+Cada request e cada pasta têm dois scripts: um antes de enviar e um depois da resposta.
+
+```js
+// pré-requisição
+carom.set('nonce', Date.now());
+carom.header('X-Nonce', carom.get('nonce'));
+
+// pós-resposta
+const body = carom.json();
+carom.set('token', body.access_token);
+```
+
+Os de pasta rodam em volta dos da request: os pré de fora para dentro, os pós de dentro para
+fora. O que um script escreve com `carom.set` vai para o ambiente ativo, então dura até a
+próxima requisição. `console.log` e `pm.test` aparecem na aba **Console** do painel de
+resposta.
+
+O `pm` do Postman também funciona (`pm.environment.set`, `pm.response.json()`,
+`pm.test`, `pm.expect`, `pm.request.headers.add`), para um script importado rodar sem ser
+reescrito.
+
+> **Scripts não rodam isolados.** São JavaScript com acesso a tudo que o app alcança,
+> incluindo a rede. Leia os scripts de uma coleção que você não escreveu antes de enviar
+> qualquer requisição dela.
+
 ## Rodar no navegador
 
 Existe uma versão web, mas o navegador limita um cliente HTTP de duas formas: o CORS decide

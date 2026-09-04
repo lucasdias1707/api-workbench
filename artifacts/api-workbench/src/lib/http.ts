@@ -1,8 +1,10 @@
 import { byteLength } from '@/lib/format';
 import { createId } from '@/lib/id';
+import { applyScriptHeaders } from '@/lib/scripts';
+import { resolveAuth } from '@/lib/inherit';
 import { splitQuery } from '@/lib/query';
 import { interpolate } from '@/lib/template';
-import type { HttpMethod, KeyValue, RequestRecord, ResponseRecord, SendMode } from '@/types';
+import type { Folder, HttpMethod, KeyValue, RequestRecord, ResponseRecord, SendMode } from '@/types';
 
 export type PreparedBody =
   | { type: 'none' }
@@ -76,15 +78,32 @@ function buildBody(request: RequestRecord, variables: Record<string, string>, ha
   return { type: 'text', text, contentType: hasExplicitContentType ? '' : defaultContentType(request) };
 }
 
+export type PrepareOptions = {
+  /**
+   * The folders the request sits in, nearest first. Only needed when its auth
+   * is inherited; without it an inheriting request sends no credentials, which
+   * is the right answer for a request that belongs to no folder.
+   */
+  folders?: Folder[];
+  /** Headers a pre-request script added, which win over the request's own. */
+  extraHeaders?: Array<{ key: string; value: string }>;
+};
+
 /**
  * Resolve a stored request into exactly what should go on the wire: variables
  * interpolated, disabled rows dropped, query params merged into the URL and
  * auth turned into concrete headers or query parameters.
  */
-export function prepareRequest(request: RequestRecord, variables: Record<string, string>): PreparedRequest {
-  const headers = activeRows(request.headers, variables);
+export function prepareRequest(
+  request: RequestRecord,
+  variables: Record<string, string>,
+  options: PrepareOptions = {},
+): PreparedRequest {
+  const headers = applyScriptHeaders(activeRows(request.headers, variables), options.extraHeaders ?? []);
   const params = activeRows(request.params, variables);
-  const auth = request.auth;
+  // An inheriting request takes the nearest folder's choice; one that picked
+  // its own keeps it, whatever the folder says.
+  const auth = resolveAuth(request.auth, options.folders ?? []).auth;
 
   if (auth.type === 'bearer' && auth.token.trim()) {
     headers.push({ key: 'Authorization', value: `Bearer ${interpolate(auth.token, variables).trim()}` });
@@ -209,7 +228,12 @@ async function sendDirect(
     headers.append(header.key, header.value);
   }
   const started = performance.now();
-  const response = await transport.fetch(prepared.url, {
+  // Pulled out of the object before being called: `window.fetch` invoked as a
+  // method of anything other than `window` throws "Illegal invocation", so
+  // `transport.fetch(...)` fails in a browser while working on the desktop,
+  // where the plugin's fetch is a plain function.
+  const send = transport.fetch;
+  const response = await send(prepared.url, {
     method: prepared.method,
     headers,
     body: toFetchBody(prepared.body),

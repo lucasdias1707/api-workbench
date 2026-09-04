@@ -58,13 +58,18 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
-- `lib/query.ts` — move a query string da URL para a tabela de Params (e o `buildUrl` devolve)
+- `lib/query.ts` — espelha a query string da URL na tabela de Params (a URL mantém a sua)
+- `lib/inherit.ts` — de onde vêm a auth e os scripts de uma request: pasta mais próxima, ou ela mesma
+- `lib/scripts.ts` — executa os scripts pré/pós, coletando variáveis, headers, logs e testes
+- `lib/pm.ts` — objeto `pm` no formato do Postman, para scripts importados rodarem sem reescrita
+- `lib/postman.ts` — leitura de uma coleção (v2.1) ou de um environment exportados do Postman
 - `lib/updates.ts` — checagem, download e restart; único lugar que conhece o plugin do updater
 - `hooks/use-update-check.ts` — estados da checagem; checa no mount, nunca baixa sozinho
 - `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição
 - `lib/json-lexer.ts` — tokeniza JSON incompleto para colorir enquanto se digita
 - `lib/editor-keys.ts` — Tab, auto-fechamento de `{ [ "` e envolver seleção, como funções puras
 - `components/request/CodeEditor.tsx` — textarea transparente sobre um espelho colorido
+- `components/layout/FolderPane.tsx` — o painel da pasta: variáveis, auth e scripts dela
 - `components/sidebar|request|response|dialogs|layout|common` — UI por área
 - `index.css` — design tokens (tema escuro e claro) e todos os componentes visuais
 
@@ -110,6 +115,17 @@ barra de menu do macOS e a bandeja do Windows pedem.
   `ALLOWED_ORIGINS` diga o contrário.
 - **Estado em reducer.** Um único `WorkspaceState` versionado passa por `state/reducer.ts`,
   o que torna abas, exclusão em cascata de pastas e limites de histórico testáveis sem UI.
+- **Herança de auth pela árvore de pastas.** Uma request nova nasce com `inherit` e usa a
+  escolha da pasta mais próxima que fez uma; escolher qualquer outra coisa — inclusive
+  "nenhuma" — a desliga da pasta para sempre. Toda request escrita antes disso carrega um
+  tipo concreto, então nenhuma mudou de comportamento sozinha.
+- **Scripts empilham; auth não.** Um script de pasta existe para rodar *além* do da request,
+  não no lugar dele: os pré rodam de fora para dentro, os pós de dentro para fora. Auth é uma
+  escolha só, então vence a pasta mais próxima.
+- **Scripts não são isolados.** São JavaScript compilado com `Function` e executado com tudo
+  que o app alcança — no desktop, isso inclui a rede e a máquina. É inerente à funcionalidade
+  (um script que não age não serve para nada), e por isso o aviso fica visível na própria aba
+  de Scripts e no diálogo de importação, não escondido num tooltip.
 - **Respostas com orçamento.** Corpos são truncados em 128 KB e o gravador vai descartando
   respostas quando o localStorage estoura a cota, para nunca perder as requisições do usuário.
 
@@ -118,9 +134,12 @@ barra de menu do macOS e a bandeja do Windows pedem.
 - Árvore de pastas aninhadas com menu de contexto (renomear, duplicar, excluir, nova pasta)
 - Abas de requisições abertas, com fechamento por clique do meio
 - Barra de URL com todos os métodos e destaque de `{{variáveis}}` (vermelho quando indefinida)
-- Abas do compositor: Params, Body, Headers, Auth, Docs
+- Abas do compositor: Params, Body, Headers, Auth, Scripts, Docs
 - Body: nenhum, JSON (com formatação e validação), texto, XML, form URL-encoded, multipart, GraphQL
-- Auth: nenhuma, Bearer, Basic, API key (header ou query)
+- Auth: herdar da pasta (padrão), nenhuma, Bearer, Basic, API key (header ou query)
+- Clicar numa pasta abre o painel dela: variáveis, auth herdada por tudo abaixo, e scripts
+- Scripts pré-requisição e pós-resposta em request e em pasta, com aba Console na resposta
+- Importar uma coleção (v2.1) ou um environment do Postman
 - Linhas de chave/valor com liga/desliga individual
 - Resposta: status colorido, tempo, tamanho, tipo; abas Pretty (árvore JSON dobrável com busca),
   Raw, Preview (HTML em iframe isolado), Headers, Cookies e History por requisição
@@ -147,6 +166,12 @@ _Nenhuma preferência persistente registrada._
 - No modo `browser` (ou quando o servidor de apoio está fora), endpoints remotos precisam
   liberar CORS; a falha aparece no painel de resposta.
 - Upload de arquivo em multipart ainda não existe — os campos são enviados como texto.
+- `carom.set` e `pm.environment.set` gravam no ambiente ativo (ou no base, se não houver
+  outro). Não gravam na request: o sentido de um script escrever uma variável é ela
+  sobreviver até a próxima requisição.
+- O `pm` é uma camada de compatibilidade, não uma reimplementação: cobre variáveis, resposta,
+  header, `pm.test` e um `expect` pequeno. `pm.sendRequest` avisa que não existe em vez de
+  quebrar no meio. Esquemas de auth sem equivalente aqui (OAuth, AWS, NTLM) viram `inherit`.
 - Variáveis e tokens do workspace de exemplo são demonstrativos. Segredos reais ficam em
   texto puro no localStorage; use um ambiente separado e evite máquinas compartilhadas.
 - Alterar `lib/api-spec/openapi.yaml` exige rodar o codegen: os arquivos em

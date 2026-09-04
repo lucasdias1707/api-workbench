@@ -12,7 +12,12 @@ export type HttpMethod = (typeof HTTP_METHODS)[number];
 export const BODY_TYPES = ['none', 'json', 'text', 'xml', 'form', 'multipart', 'graphql'] as const;
 export type BodyType = (typeof BODY_TYPES)[number];
 
-export type AuthType = 'none' | 'bearer' | 'basic' | 'apikey';
+/**
+ * `inherit` takes whatever the nearest enclosing folder defines, and is the
+ * default for a new request. Every request written before this existed carries
+ * a concrete type, so none of them silently changed behaviour.
+ */
+export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey';
 
 export type KeyValue = {
   id: string;
@@ -62,6 +67,10 @@ export type RequestRecord = {
   multipart: KeyValue[];
   graphql: GraphQLBody;
   auth: Auth;
+  /** Runs before the request is sent, outermost folder first. */
+  preScript: string;
+  /** Runs after the response arrives, innermost first. */
+  postScript: string;
   sortIndex: number;
   createdAt: string;
   updatedAt: string;
@@ -81,6 +90,11 @@ export type Folder = {
    * over an environment.
    */
   variables: KeyValue[];
+  /** Applied to every request beneath that has not chosen its own. */
+  auth: Auth;
+  /** Wrap every request beneath: pre runs before, post after. */
+  preScript: string;
+  postScript: string;
 };
 
 export type Workspace = {
@@ -185,5 +199,7 @@ export type WorkspaceState = {
   activeEnvironmentId: string | null;
   openTabIds: string[];
   activeRequestId: string | null;
+  /** Set when a folder's own pane is open; clears when a request is opened. */
+  activeFolderId: string | null;
   settings: Settings;
 };

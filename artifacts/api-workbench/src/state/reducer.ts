@@ -14,7 +14,8 @@ function touch(request: RequestRecord, patch: Partial<RequestRecord>): RequestRe
 
 function withTabOpen(state: WorkspaceState, id: string): WorkspaceState {
   const openTabIds = state.openTabIds.includes(id) ? state.openTabIds : [...state.openTabIds, id];
-  return { ...state, openTabIds, activeRequestId: id };
+  // A request and a folder never share the pane, so opening one closes the other.
+  return { ...state, openTabIds, activeRequestId: id, activeFolderId: null };
 }
 
 /** Pick the tab that should take focus after `closedId` goes away. */
@@ -148,8 +149,24 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         state.requests.filter((request) => request.folderId && doomedFolders.has(request.folderId)).map((request) => request.id),
       );
       const next = removeRequests(state, doomedRequests);
-      return { ...next, folders: next.folders.filter((folder) => !doomedFolders.has(folder.id)) };
+      return {
+        ...next,
+        folders: next.folders.filter((folder) => !doomedFolders.has(folder.id)),
+        activeFolderId:
+          next.activeFolderId && doomedFolders.has(next.activeFolderId) ? null : next.activeFolderId,
+      };
     }
+
+    case 'folder/open':
+      return { ...state, activeFolderId: action.id, activeRequestId: action.id ? null : state.activeRequestId };
+
+    case 'folder/update':
+      return {
+        ...state,
+        folders: state.folders.map((folder) =>
+          folder.id === action.id ? { ...folder, ...action.patch } : folder,
+        ),
+      };
 
     case 'folder/variables':
       return {
@@ -168,12 +185,20 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
         activeEnvironmentId: null,
         openTabIds: [],
         activeRequestId: null,
+        activeFolderId: null,
       };
 
     case 'workspace/activate': {
       if (action.id === state.activeWorkspaceId) return state;
       // Tabs belong to the workspace they were opened from.
-      return { ...state, activeWorkspaceId: action.id, activeEnvironmentId: null, openTabIds: [], activeRequestId: null };
+      return {
+        ...state,
+        activeWorkspaceId: action.id,
+        activeEnvironmentId: null,
+        openTabIds: [],
+        activeRequestId: null,
+        activeFolderId: null,
+      };
     }
 
     case 'workspace/rename':
@@ -240,6 +265,19 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
 
     case 'response/clear':
       return { ...state, responses: state.responses.filter((response) => response.requestId !== action.requestId) };
+
+    case 'import/merge': {
+      const next: WorkspaceState = {
+        ...state,
+        folders: [...state.folders, ...action.folders],
+        requests: [...state.requests, ...action.requests],
+        environments: action.environment ? [...state.environments, action.environment] : state.environments,
+      };
+      // Land on what was just imported rather than leaving it to be hunted for
+      // in the tree: the outermost new folder, or the new environment's owner.
+      const landing = action.folders[0];
+      return landing ? { ...next, activeFolderId: landing.id, activeRequestId: null } : next;
+    }
 
     case 'settings/update':
       return { ...state, settings: { ...state.settings, ...action.patch } };

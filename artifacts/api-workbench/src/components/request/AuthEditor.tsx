@@ -1,6 +1,8 @@
-import type { Auth, AuthType, RequestRecord } from '@/types';
+import { resolveAuth } from '@/lib/inherit';
+import type { Auth, AuthType, Folder } from '@/types';
 
 const AUTH_LABELS: Record<AuthType, string> = {
+  inherit: 'Inherit from parent',
   none: 'No auth',
   bearer: 'Bearer token',
   basic: 'Basic auth',
@@ -8,13 +10,30 @@ const AUTH_LABELS: Record<AuthType, string> = {
 };
 
 type AuthEditorProps = {
-  request: RequestRecord;
-  onChange: (patch: Partial<RequestRecord>) => void;
+  auth: Auth;
+  onChange: (auth: Auth) => void;
+  /**
+   * The folders to inherit through, nearest first. Empty means there is
+   * nothing above this record, so "Inherit" is not offered.
+   */
+  chain?: Folder[];
+  /** What the thing being edited is, for the copy. */
+  subject: 'request' | 'folder';
 };
 
-export function AuthEditor({ request, onChange }: AuthEditorProps) {
-  const auth = request.auth;
-  const setAuth = (patch: Partial<Auth>) => onChange({ auth: { ...auth, ...patch } });
+export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorProps) {
+  const setAuth = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
+  const inherited = resolveAuth({ ...auth, type: 'inherit' }, chain);
+  const canInherit = chain.length > 0;
+
+  const types = (Object.keys(AUTH_LABELS) as AuthType[]).filter((type) => type !== 'inherit' || canInherit);
+
+  /**
+   * Stop inheriting, keeping what was being inherited as a starting point.
+   * Copying rather than clearing is the point of the button: someone detaching
+   * usually wants to change one field of what the folder already sends.
+   */
+  const detach = () => onChange({ ...inherited.auth });
 
   return (
     <div className="pane-pad stack">
@@ -28,7 +47,7 @@ export function AuthEditor({ request, onChange }: AuthEditorProps) {
           aria-label="Auth type"
           data-testid="select-auth-type"
         >
-          {(Object.keys(AUTH_LABELS) as AuthType[]).map((type) => (
+          {types.map((type) => (
             <option key={type} value={type}>
               {AUTH_LABELS[type]}
             </option>
@@ -36,9 +55,32 @@ export function AuthEditor({ request, onChange }: AuthEditorProps) {
         </select>
       </div>
 
+      {auth.type === 'inherit' ? (
+        <div className="inherit-note" data-testid="auth-inherited">
+          {inherited.from === 'folder' ? (
+            <>
+              <p>
+                Using <strong>{AUTH_LABELS[inherited.auth.type]}</strong> from the folder{' '}
+                <strong>{inherited.folder.name}</strong>. Editing it there changes every{' '}
+                {subject === 'folder' ? 'folder and request' : 'request'} beneath that still inherits.
+              </p>
+              <button className="btn btn-sm" onClick={detach} data-testid="button-auth-detach">
+                Give this {subject} its own
+              </button>
+            </>
+          ) : (
+            <p>
+              No folder above this {subject} sets any authentication, so nothing is attached. Pick a type here, or set
+              one on a folder to cover everything inside it at once.
+            </p>
+          )}
+        </div>
+      ) : null}
+
       {auth.type === 'none' ? (
         <p className="hint">
           No credentials are attached. Any <code>Authorization</code> header you add on the Headers tab is still sent.
+          {canInherit ? ' This overrides the folder, which is what makes it different from inheriting.' : ''}
         </p>
       ) : null}
 
@@ -131,9 +173,12 @@ export function AuthEditor({ request, onChange }: AuthEditorProps) {
         </div>
       ) : null}
 
-      <p className="hint">
-        Credentials support <code>{'{{variables}}'}</code>, so tokens can live in an environment instead of the request.
-      </p>
+      {auth.type !== 'inherit' ? (
+        <p className="hint">
+          Credentials support <code>{'{{variables}}'}</code>, so tokens can live in an environment instead of the{' '}
+          {subject}.
+        </p>
+      ) : null}
     </div>
   );
 }

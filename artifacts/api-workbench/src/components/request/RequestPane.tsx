@@ -3,6 +3,7 @@ import { Copy, Terminal } from 'lucide-react';
 import { AuthEditor } from '@/components/request/AuthEditor';
 import { BodyEditor } from '@/components/request/BodyEditor';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
+import { ScriptEditor } from '@/components/request/ScriptEditor';
 import { UrlBar } from '@/components/request/UrlBar';
 import { useToast } from '@/components/common/Toaster';
 import { toCurl } from '@/lib/curl';
@@ -10,9 +11,10 @@ import { prepareRequest } from '@/lib/http';
 import { paramsMatchUrl, splitQuery, syncUrlParams } from '@/lib/query';
 import { folderPath } from '@/state/selectors';
 import { useWorkspace } from '@/state/workspace-store';
-import type { HttpMethod, KeyValue, RequestRecord } from '@/types';
+import { resolveAuth } from '@/lib/inherit';
+import type { Auth, HttpMethod, KeyValue, RequestRecord } from '@/types';
 
-type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'docs';
+type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'scripts' | 'docs';
 
 /** Long enough to finish a word, short enough to feel like the table follows. */
 const URL_PARAM_DEBOUNCE_MS = 500;
@@ -22,6 +24,7 @@ const TABS: Array<{ id: RequestTab; label: string }> = [
   { id: 'body', label: 'Body' },
   { id: 'headers', label: 'Headers' },
   { id: 'auth', label: 'Auth' },
+  { id: 'scripts', label: 'Scripts' },
   { id: 'docs', label: 'Docs' },
 ];
 
@@ -33,7 +36,7 @@ type RequestPaneProps = {
 };
 
 export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneProps) {
-  const { state, dispatch, variables, variableTable } = useWorkspace();
+  const { state, dispatch, variables, variableTable, chainFor } = useWorkspace();
   const { toast } = useToast();
   const [tab, setTab] = useState<RequestTab>('params');
 
@@ -63,9 +66,14 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
     headers: activeCount(request.headers),
   };
 
+  // What this request actually authenticates with, which may come from a
+  // folder rather than the request itself.
+  const chain = chainFor(request.folderId);
+  const authSource = resolveAuth(request.auth, chain);
+
   const copyAsCurl = async () => {
     try {
-      await navigator.clipboard.writeText(toCurl(prepareRequest(request, variables)));
+      await navigator.clipboard.writeText(toCurl(prepareRequest(request, variables, { folders: chain })));
       toast({ title: 'Copied as curl', kind: 'success' });
     } catch (error) {
       toast({
@@ -102,7 +110,15 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
             {item.label}
             {badges[item.id] ? <span className="badge">{badges[item.id]}</span> : null}
             {item.id === 'body' && request.bodyType !== 'none' ? <span className="badge">{request.bodyType}</span> : null}
-            {item.id === 'auth' && request.auth.type !== 'none' ? <span className="badge">{request.auth.type}</span> : null}
+            {item.id === 'auth' && authSource.auth.type !== 'none' ? (
+              <span className="badge" title={authSource.from === 'folder' ? `Inherited from ${authSource.folder.name}` : undefined}>
+                {authSource.auth.type}
+                {authSource.from === 'folder' ? ' ·' : ''}
+              </span>
+            ) : null}
+            {item.id === 'scripts' && (request.preScript.trim() || request.postScript.trim()) ? (
+              <span className="badge">on</span>
+            ) : null}
           </button>
         ))}
         <span style={{ flex: 1 }} />
@@ -112,7 +128,7 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         <button
           className="icon-btn"
           onClick={() => {
-            navigator.clipboard?.writeText(prepareRequest(request, variables).url);
+            navigator.clipboard?.writeText(prepareRequest(request, variables, { folders: chain }).url);
             toast({ title: 'URL copied', kind: 'success' });
           }}
           title="Copy resolved URL"
@@ -143,7 +159,19 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         ) : null}
 
         {tab === 'body' ? <BodyEditor request={request} onChange={patch} /> : null}
-        {tab === 'auth' ? <AuthEditor request={request} onChange={patch} /> : null}
+        {tab === 'auth' ? (
+          <AuthEditor auth={request.auth} onChange={(auth: Auth) => patch({ auth })} chain={chain} subject="request" />
+        ) : null}
+
+        {tab === 'scripts' ? (
+          <ScriptEditor
+            preScript={request.preScript}
+            postScript={request.postScript}
+            onChange={patch}
+            subject="request"
+            testPrefix="request"
+          />
+        ) : null}
 
         {tab === 'docs' ? (
           <div className="pane-pad stack">

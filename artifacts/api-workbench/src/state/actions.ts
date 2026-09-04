@@ -15,6 +15,8 @@ export type Action =
   | { type: 'folder/rename'; id: string; name: string }
   | { type: 'folder/delete'; id: string }
   | { type: 'folder/variables'; id: string; variables: KeyValue[] }
+  | { type: 'folder/update'; id: string; patch: Partial<Folder> }
+  | { type: 'folder/open'; id: string | null }
   | { type: 'workspace/create'; workspace: Workspace; environment: Environment }
   | { type: 'workspace/activate'; id: string }
   | { type: 'workspace/rename'; id: string; name: string }
@@ -25,4 +27,6 @@ export type Action =
   | { type: 'environment/delete'; id: string }
   | { type: 'response/add'; response: ResponseRecord }
   | { type: 'response/clear'; requestId: string }
-  | { type: 'settings/update'; patch: Partial<Settings> };
+  | { type: 'settings/update'; patch: Partial<Settings> }
+  /** Append a whole imported tree at once, so one undoable step covers it. */
+  | { type: 'import/merge'; folders: Folder[]; requests: RequestRecord[]; environment: Environment | null };

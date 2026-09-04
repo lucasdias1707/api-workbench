@@ -48,6 +48,12 @@ export type Action =
       workspace?: Workspace | null;
       /** Base environment for a workspace created by this import. */
       baseEnvironment?: Environment | null;
+      /**
+       * Variables for the destination's base environment — where an imported
+       * collection's own variables belong, since Postman resolves those below
+       * the selected environment. Names the base already defines are kept.
+       */
+      baseVariables?: KeyValue[];
       /** Which workspace to land in; defaults to the active one. */
       workspaceId?: string;
     };

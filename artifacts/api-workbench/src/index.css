@@ -926,9 +926,14 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
   background: var(--bg-surface);
   box-shadow: var(--shadow-pop);
 }
+/* A grid item is `min-width: auto` by default, so one unbreakable string — a
+   JWT is the usual culprit — widens its track and drags the whole popover's
+   contents past the border with it. */
+.var-popover > * { min-width: 0; }
 .var-popover-head { display: flex; align-items: center; gap: 7px; font-size: 12px; }
 .var-popover-head .spacer { flex: 1; }
-.var-popover-origin { font-size: 11px; color: var(--text-dim); }
+.var-popover-head .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.var-popover-origin { font-size: 11px; color: var(--text-dim); overflow-wrap: anywhere; }
 .var-popover-origin strong { color: var(--text); font-weight: 600; }
 .var-popover-row { display: flex; align-items: center; gap: 6px; }
 /* .field is width:100%, which in a flex row overlaps whatever follows it. */
@@ -940,7 +945,14 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
   padding-top: 6px;
   border-top: 1px solid var(--border);
   line-height: 1.6;
+  /* A token has no spaces to break at, so it needs permission to break
+     anywhere; and once it wraps, it needs a ceiling — a 900-character JWT
+     would otherwise make a popover taller than the window. */
+  overflow-wrap: anywhere;
+  max-height: 84px;
+  overflow-y: auto;
 }
+.var-popover-shadowed .mono { color: var(--text-dim); }
 
 /* ==========================================================================
    Workspace and environment pickers

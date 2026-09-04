@@ -109,6 +109,7 @@ export function ImportPostmanDialog({ onClose }: { onClose: () => void }) {
       folders,
       requests,
       environment: targeted.environment,
+      baseVariables: targeted.variables,
       workspace,
       // A new workspace needs a base environment, the same one the workspace
       // menu would have given it.
@@ -122,7 +123,11 @@ export function ImportPostmanDialog({ onClose }: { onClose: () => void }) {
       title: `Imported ${preview.name}`,
       description: targeted.environment
         ? `${targeted.environment.variables.length} variables into ${where?.name ?? 'this workspace'}.`
-        : `${requests.length} requests into ${where?.name ?? 'this workspace'}.`,
+        : `${requests.length} requests into ${where?.name ?? 'this workspace'}${
+            targeted.variables.length > 0
+              ? `, and ${targeted.variables.length} variables into its base environment`
+              : ''
+          }.`,
       kind: 'success',
     });
     onClose();
@@ -306,8 +311,14 @@ export function ImportPostmanDialog({ onClose }: { onClose: () => void }) {
           ) : null}
 
           <p className="hint">
-            The collection becomes a folder, keeping its variables, its auth and its scripts, so everything inside it
-            still inherits the way it did in Postman. Requests that set their own auth keep it.
+            The collection becomes a folder, keeping its auth and its scripts, so everything inside it still inherits
+            the way it did in Postman. Requests that set their own auth keep it.
+          </p>
+          <p className="hint">
+            Its <strong>variables</strong> go into the base environment, not the folder. Postman resolves an
+            environment before a collection, and folder variables here win over environments — so putting them on the
+            folder would let a blank collection default shadow the real value in your selected environment. A name the
+            base already defines is left alone.
           </p>
         </div>
       )}

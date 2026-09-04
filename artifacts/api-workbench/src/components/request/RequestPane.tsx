@@ -1,24 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Copy, Terminal } from 'lucide-react';
 import { AuthEditor } from '@/components/request/AuthEditor';
 import { BodyEditor } from '@/components/request/BodyEditor';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
+import { ScriptEditor } from '@/components/request/ScriptEditor';
 import { UrlBar } from '@/components/request/UrlBar';
 import { useToast } from '@/components/common/Toaster';
 import { toCurl } from '@/lib/curl';
 import { prepareRequest } from '@/lib/http';
-import { mergeParams, splitQuery } from '@/lib/query';
+import { paramsMatchUrl, splitQuery, syncUrlParams } from '@/lib/query';
 import { folderPath } from '@/state/selectors';
 import { useWorkspace } from '@/state/workspace-store';
-import type { HttpMethod, KeyValue, RequestRecord } from '@/types';
+import { resolveAuth } from '@/lib/inherit';
+import type { Auth, HttpMethod, KeyValue, RequestRecord } from '@/types';
 
-type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'docs';
+type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'scripts' | 'docs';
+
+/** Long enough to finish a word, short enough to feel like the table follows. */
+const URL_PARAM_DEBOUNCE_MS = 500;
 
 const TABS: Array<{ id: RequestTab; label: string }> = [
   { id: 'params', label: 'Params' },
   { id: 'body', label: 'Body' },
   { id: 'headers', label: 'Headers' },
   { id: 'auth', label: 'Auth' },
+  { id: 'scripts', label: 'Scripts' },
   { id: 'docs', label: 'Docs' },
 ];
 
@@ -30,11 +36,28 @@ type RequestPaneProps = {
 };
 
 export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneProps) {
-  const { state, dispatch, variables, variableTable } = useWorkspace();
+  const { state, dispatch, variables, variableTable, chainFor } = useWorkspace();
   const { toast } = useToast();
   const [tab, setTab] = useState<RequestTab>('params');
 
   const patch = (changes: Partial<RequestRecord>) => dispatch({ type: 'request/update', id: request.id, patch: changes });
+
+  // Mirror the URL's query string into the Params table, a beat after typing
+  // stops. Doing it on every keystroke would add a row for `?p`, then replace
+  // it for `?pa`, and so on down the word.
+  //
+  // The URL keeps its query; `prepareRequest` takes the query from the table
+  // instead of the URL so nothing is sent twice.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const { params } = splitQuery(request.url);
+      if (paramsMatchUrl(request.params, params)) return;
+      patch({ params: syncUrlParams(request.params, params) });
+    }, URL_PARAM_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+    // `patch` closes over the id, which is what the other dependencies pin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [request.id, request.url, request.params]);
   const setRows = (field: 'params' | 'headers') => (items: KeyValue[]) => patch({ [field]: items });
 
   const activeCount = (items: KeyValue[]) => items.filter((item) => item.enabled && item.key.trim()).length;
@@ -43,9 +66,14 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
     headers: activeCount(request.headers),
   };
 
+  // What this request actually authenticates with, which may come from a
+  // folder rather than the request itself.
+  const chain = chainFor(request.folderId);
+  const authSource = resolveAuth(request.auth, chain);
+
   const copyAsCurl = async () => {
     try {
-      await navigator.clipboard.writeText(toCurl(prepareRequest(request, variables)));
+      await navigator.clipboard.writeText(toCurl(prepareRequest(request, variables, { folders: chain })));
       toast({ title: 'Copied as curl', kind: 'success' });
     } catch (error) {
       toast({
@@ -67,14 +95,6 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         sending={sending}
         onMethodChange={(method: HttpMethod) => patch({ method })}
         onUrlChange={(url) => patch({ url })}
-        onUrlCommit={(url) => {
-          // Query parameters written into the URL move into the Params table,
-          // where they can be toggled and edited. Sending puts them back, so
-          // leaving them in the URL as well would send each one twice.
-          const { base, params } = splitQuery(url);
-          if (params.length === 0) return;
-          patch({ url: base, params: mergeParams(request.params, params) });
-        }}
         onSend={onSend}
         onCancel={onCancel}
       />
@@ -90,7 +110,15 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
             {item.label}
             {badges[item.id] ? <span className="badge">{badges[item.id]}</span> : null}
             {item.id === 'body' && request.bodyType !== 'none' ? <span className="badge">{request.bodyType}</span> : null}
-            {item.id === 'auth' && request.auth.type !== 'none' ? <span className="badge">{request.auth.type}</span> : null}
+            {item.id === 'auth' && authSource.auth.type !== 'none' ? (
+              <span className="badge" title={authSource.from === 'folder' ? `Inherited from ${authSource.folder.name}` : undefined}>
+                {authSource.auth.type}
+                {authSource.from === 'folder' ? ' ·' : ''}
+              </span>
+            ) : null}
+            {item.id === 'scripts' && (request.preScript.trim() || request.postScript.trim()) ? (
+              <span className="badge">on</span>
+            ) : null}
           </button>
         ))}
         <span style={{ flex: 1 }} />
@@ -100,7 +128,7 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         <button
           className="icon-btn"
           onClick={() => {
-            navigator.clipboard?.writeText(prepareRequest(request, variables).url);
+            navigator.clipboard?.writeText(prepareRequest(request, variables, { folders: chain }).url);
             toast({ title: 'URL copied', kind: 'success' });
           }}
           title="Copy resolved URL"
@@ -131,7 +159,19 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         ) : null}
 
         {tab === 'body' ? <BodyEditor request={request} onChange={patch} /> : null}
-        {tab === 'auth' ? <AuthEditor request={request} onChange={patch} /> : null}
+        {tab === 'auth' ? (
+          <AuthEditor auth={request.auth} onChange={(auth: Auth) => patch({ auth })} chain={chain} subject="request" />
+        ) : null}
+
+        {tab === 'scripts' ? (
+          <ScriptEditor
+            preScript={request.preScript}
+            postScript={request.postScript}
+            onChange={patch}
+            subject="request"
+            testPrefix="request"
+          />
+        ) : null}
 
         {tab === 'docs' ? (
           <div className="pane-pad stack">

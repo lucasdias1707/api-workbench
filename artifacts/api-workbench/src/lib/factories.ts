@@ -22,7 +22,20 @@ export function createWorkspace(name: string): Workspace {
 }
 
 export function createFolder(workspaceId: string, name: string, parentId: string | null, sortIndex: number, color = '#6d8fff'): Folder {
-  return { id: createId('fld'), workspaceId, parentId, name, color, sortIndex, variables: [] };
+  return {
+    id: createId('fld'),
+    workspaceId,
+    parentId,
+    name,
+    color,
+    sortIndex,
+    variables: [],
+    // A folder inherits from its own parent until it says otherwise, so auth
+    // set on an outer folder reaches everything under it.
+    auth: { ...emptyAuth(), type: 'inherit' },
+    preScript: '',
+    postScript: '',
+  };
 }
 
 export function createRequest(overrides: Partial<RequestRecord> & { workspaceId: string }): RequestRecord {
@@ -41,7 +54,10 @@ export function createRequest(overrides: Partial<RequestRecord> & { workspaceId:
     form: [],
     multipart: [],
     graphql: { query: 'query {\n  \n}', variables: '{}' },
-    auth: emptyAuth(),
+    // New requests take the folder's auth; picking anything else detaches them.
+    auth: { ...emptyAuth(), type: 'inherit' },
+    preScript: '',
+    postScript: '',
     sortIndex: 0,
     createdAt: now,
     updatedAt: now,
@@ -63,6 +79,10 @@ export function createEnvironment(
 }
 
 /** Deep-enough copy so edits to a draft never mutate stored state. */
+export function cloneFolder(folder: Folder): Folder {
+  return { ...folder, variables: folder.variables.map((item) => ({ ...item })), auth: { ...folder.auth } };
+}
+
 export function cloneRequest(request: RequestRecord): RequestRecord {
   return {
     ...request,

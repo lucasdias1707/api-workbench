@@ -4,13 +4,17 @@ import { JsonTree } from '@/components/response/JsonTree';
 import { useToast } from '@/components/common/Toaster';
 import { byteLength, contentTypeLabel, formatBytes, formatDuration, formatRelative, statusFamily, tryPrettyJson } from '@/lib/format';
 import { useWorkspace } from '@/state/workspace-store';
+import type { ScriptLogEntry, ScriptTest } from '@/lib/scripts';
 import type { ResponseRecord } from '@/types';
 
-type ResponseTab = 'pretty' | 'raw' | 'preview' | 'headers' | 'cookies' | 'history';
+type ResponseTab = 'pretty' | 'raw' | 'preview' | 'headers' | 'cookies' | 'console' | 'history';
 
 type ResponsePaneProps = {
   requestId: string;
   sending: boolean;
+  /** What the last run's scripts printed and asserted. */
+  scriptLogs?: ScriptLogEntry[];
+  scriptTests?: ScriptTest[];
 };
 
 function headerValue(response: ResponseRecord, name: string): string | undefined {
@@ -28,7 +32,7 @@ function parseCookie(raw: string): { name: string; value: string; attributes: st
   };
 }
 
-export function ResponsePane({ requestId, sending }: ResponsePaneProps) {
+export function ResponsePane({ requestId, sending, scriptLogs = [], scriptTests = [] }: ResponsePaneProps) {
   const { responsesFor, dispatch } = useWorkspace();
   const { toast } = useToast();
   const [tab, setTab] = useState<ResponseTab>('pretty');
@@ -92,6 +96,7 @@ export function ResponsePane({ requestId, sending }: ResponsePaneProps) {
     { id: 'preview', label: 'Preview' },
     { id: 'headers', label: 'Headers', count: response.headers.length },
     { id: 'cookies', label: 'Cookies', count: cookies.length },
+    { id: 'console', label: 'Console', count: scriptLogs.length + scriptTests.length },
     { id: 'history', label: 'History', count: responses.length },
   ];
 
@@ -191,6 +196,35 @@ export function ResponsePane({ requestId, sending }: ResponsePaneProps) {
               {prettyText || '(empty response body)'}
             </pre>
           )
+        ) : null}
+
+        {tab === 'console' ? (
+          <div className="pane-pad stack" data-testid="script-console">
+            {scriptTests.length === 0 && scriptLogs.length === 0 ? (
+              <p className="hint">
+                Nothing was printed. <code>console.log</code> and <code>pm.test</code> from this request&rsquo;s scripts,
+                and from the folders around it, show up here after a send.
+              </p>
+            ) : null}
+            {scriptTests.map((test, index) => (
+              <div key={`test-${index}`} className="script-line" data-testid="script-test">
+                <span className={`status-code ${test.passed ? 'success' : 'client'}`}>
+                  {test.passed ? 'PASS' : 'FAIL'}
+                </span>
+                <span className="truncate">{test.name}</span>
+                {test.error ? <span className="status-meta">{test.error}</span> : null}
+                <span className="status-meta">{test.source}</span>
+              </div>
+            ))}
+            {scriptLogs.map((entry, index) => (
+              <div key={`log-${index}`} className="script-line" data-testid="script-log">
+                <span className={`chip ${entry.level === 'error' ? 'danger' : ''}`}>{entry.source}</span>
+                <pre className="code wrap" style={{ padding: 0, background: 'none', border: 'none' }}>
+                  {entry.text}
+                </pre>
+              </div>
+            ))}
+          </div>
         ) : null}
 
         {tab === 'raw' ? (

@@ -1,7 +1,10 @@
 import { byteLength } from '@/lib/format';
 import { createId } from '@/lib/id';
+import { applyScriptHeaders } from '@/lib/scripts';
+import { resolveAuth } from '@/lib/inherit';
+import { splitQuery } from '@/lib/query';
 import { interpolate } from '@/lib/template';
-import type { HttpMethod, KeyValue, RequestRecord, ResponseRecord, SendMode } from '@/types';
+import type { Folder, HttpMethod, KeyValue, RequestRecord, ResponseRecord, SendMode } from '@/types';
 
 export type PreparedBody =
   | { type: 'none' }
@@ -75,15 +78,32 @@ function buildBody(request: RequestRecord, variables: Record<string, string>, ha
   return { type: 'text', text, contentType: hasExplicitContentType ? '' : defaultContentType(request) };
 }
 
+export type PrepareOptions = {
+  /**
+   * The folders the request sits in, nearest first. Only needed when its auth
+   * is inherited; without it an inheriting request sends no credentials, which
+   * is the right answer for a request that belongs to no folder.
+   */
+  folders?: Folder[];
+  /** Headers a pre-request script added, which win over the request's own. */
+  extraHeaders?: Array<{ key: string; value: string }>;
+};
+
 /**
  * Resolve a stored request into exactly what should go on the wire: variables
  * interpolated, disabled rows dropped, query params merged into the URL and
  * auth turned into concrete headers or query parameters.
  */
-export function prepareRequest(request: RequestRecord, variables: Record<string, string>): PreparedRequest {
-  const headers = activeRows(request.headers, variables);
+export function prepareRequest(
+  request: RequestRecord,
+  variables: Record<string, string>,
+  options: PrepareOptions = {},
+): PreparedRequest {
+  const headers = applyScriptHeaders(activeRows(request.headers, variables), options.extraHeaders ?? []);
   const params = activeRows(request.params, variables);
-  const auth = request.auth;
+  // An inheriting request takes the nearest folder's choice; one that picked
+  // its own keeps it, whatever the folder says.
+  const auth = resolveAuth(request.auth, options.folders ?? []).auth;
 
   if (auth.type === 'bearer' && auth.token.trim()) {
     headers.push({ key: 'Authorization', value: `Bearer ${interpolate(auth.token, variables).trim()}` });
@@ -103,7 +123,25 @@ export function prepareRequest(request: RequestRecord, variables: Record<string,
     headers.push({ key: 'Content-Type', value: body.contentType });
   }
 
-  return { method: request.method, url: buildUrl(interpolate(request.url, variables), params), headers, body };
+  // The URL keeps the query someone typed into it, and the Params table
+  // mirrors it. Appending the table to that URL would send every mirrored
+  // parameter twice, so the address goes out without its query and the table
+  // supplies the whole query instead.
+  //
+  // A parameter the table has never heard of is still sent: the mirror is
+  // debounced and Send can beat it, and dropping what was just typed would be
+  // worse than sending it. The test is the key, not the whole pair — once the
+  // table has a row for `page`, that row is the one that counts, whether it
+  // was edited, unticked, or left alone.
+  const { base, params: fromUrl } = splitQuery(interpolate(request.url, variables));
+  const tableKeys = new Set(
+    request.params.map((param) => interpolate(param.key, variables).trim()).filter(Boolean),
+  );
+  for (const param of fromUrl) {
+    if (!tableKeys.has(param.key)) params.push(param);
+  }
+
+  return { method: request.method, url: buildUrl(base, params), headers, body };
 }
 
 /** Merge query parameters into a URL without losing ones already written by hand. */
@@ -190,7 +228,12 @@ async function sendDirect(
     headers.append(header.key, header.value);
   }
   const started = performance.now();
-  const response = await transport.fetch(prepared.url, {
+  // Pulled out of the object before being called: `window.fetch` invoked as a
+  // method of anything other than `window` throws "Illegal invocation", so
+  // `transport.fetch(...)` fails in a browser while working on the desktop,
+  // where the plugin's fetch is a plain function.
+  const send = transport.fetch;
+  const response = await send(prepared.url, {
     method: prepared.method,
     headers,
     body: toFetchBody(prepared.body),

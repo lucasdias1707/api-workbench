@@ -1215,6 +1215,148 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
   .desktop-only { display: none !important; }
 }
 
+/* The update button in the top bar: the one coloured control up there, so it
+   reads as "something happened" among monochrome icons. */
+.update-badge { position: relative; color: var(--accent); }
+.update-badge:hover:not(:disabled) { color: var(--accent); background: var(--accent-soft); }
+.update-badge.ready { color: var(--green); }
+.update-badge.ready:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 16%, transparent); }
+.update-badge.busy { color: var(--text-dim); }
+.update-badge.busy svg { animation: update-pulse 1.4s ease-in-out infinite; }
+
+/* The dot sits where a count would, but there is only ever one update.
+   It hangs off the corner rather than sitting on the glyph: overlapping the
+   arrow made it read as a smudge on the icon instead of a badge on the
+   button. The ring is the bar's own background, so it stays separate. */
+.update-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 2px var(--bg-sidebar);
+}
+.update-badge:hover .update-dot { box-shadow: 0 0 0 2px var(--accent-soft); }
+.update-badge.ready:hover .update-dot {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--green) 16%, var(--bg-sidebar));
+}
+
+@keyframes update-pulse {
+  0%, 100% { opacity: 1; transform: translateY(0); }
+  50% { opacity: 0.45; transform: translateY(1px); }
+}
+
+/* Hover text on the update button. Written here rather than left to the
+   browser's `title` because this one is meant to be read, and the native
+   tooltip takes a second to appear and cannot be styled. */
+[data-tooltip] { position: relative; }
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 40;
+  max-width: 240px;
+  width: max-content;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 11.5px;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: var(--shadow-pop);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease-out;
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after { opacity: 1; }
+
+/* The Postman import picker: a scrollable tree of what is in the file. */
+.import-tree {
+  max-height: 240px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 24px;
+  padding-right: 6px;
+  font-size: 12px;
+  color: var(--text);
+}
+.import-row:hover { background: var(--bg-hover); }
+.import-caret {
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+/* A folder's own pane: its header, and the note a request shows when its auth
+   comes from a folder rather than from itself. */
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+.folder-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  border-color: transparent;
+}
+.folder-title:hover { border-color: var(--border); }
+.folder-title:focus { background: var(--bg-raised); border-color: var(--accent); }
+.icon-btn.danger:hover { color: var(--red); }
+
+.inherit-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--blue);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.inherit-note p { margin: 0; }
+.inherit-note strong { color: var(--text); font-weight: 600; }
+
+/* One line of script output: a pm.test result, or something a script printed. */
+.script-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.script-line:last-child { border-bottom: 0; }
+.script-line .chip.danger { color: var(--red); }
+.script-line pre { margin: 0; font-size: 11.5px; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }

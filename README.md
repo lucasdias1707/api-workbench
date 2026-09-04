@@ -60,9 +60,16 @@ versões recentes do macOS para este caso — use um dos dois caminhos acima.
 ## Atualização
 
 A partir da `v0.2.0` o Carom se atualiza sozinho. Ao abrir, ele consulta as releases deste
-repositório; se houver versão nova, aparece um aviso em **Settings → Updates** com as notas
-da versão e um botão **Download and install**. O download só acontece se você clicar —
-nunca sozinho. Terminando, é um clique em **Restart now** e pronto.
+repositório. Se houver versão nova, duas coisas acontecem:
+
+- um **aviso na tela** dizendo qual versão saiu;
+- um **botão de download azul** aparece na barra de cima, ao lado da engrenagem — passando o
+  mouse nele, o texto diz qual versão está disponível. Ele só existe quando há o que baixar,
+  fica cinza enquanto baixa e verde (com ícone de reiniciar) quando termina.
+
+Clicar nesse botão abre **Settings → Updates**, com as notas da versão e **Download and
+install**. O download só acontece se você clicar — nunca sozinho. Terminando, é um clique em
+**Restart now** e pronto.
 
 A checagem automática pode ser desligada no mesmo lugar; aí o update só acontece quando você
 clicar em **Check now**.
@@ -119,6 +126,53 @@ opções são:
   script de instalação com `curl`. A quarentena é carimbada pelo **navegador**, não pelo
   arquivo — um download que não passa por navegador não recebe o carimbo e não dispara o
   Gatekeeper. O app continua sem certificado; quem instala confia em você do mesmo jeito.
+
+## Vindo do Postman
+
+`Import Postman`, na barra lateral, lê uma **coleção (v2.1)** ou um **environment** exportados
+do Postman — por arquivo ou colando o JSON.
+
+Antes de importar você vê a árvore inteira e marca o que quer: marcar uma pasta leva tudo
+abaixo dela, e dá para desmarcar uma request específica dentro de uma pasta marcada. Uma pasta
+que você deixou desmarcada ainda vem junto se algo dentro dela foi marcado — sem ela a request
+não teria onde ficar.
+
+Também dá para escolher **para qual workspace** vai, inclusive um **criado ali na hora**. Útil
+para não misturar uma coleção de terceiros com o seu trabalho.
+
+A coleção vira uma pasta, e é ela que guarda as variáveis, a auth e os scripts que estavam no
+nível da coleção. Assim tudo dentro continua herdando como herdava lá: uma request sem bloco
+de auth fica em "Inherit from parent", uma que definia a sua mantém a sua.
+
+Esquemas de auth que não existem aqui (OAuth, AWS, NTLM) viram "herdar" — nada é enviado, e a
+aba Auth diz isso, em vez de fingir que o fluxo veio junto.
+
+## Scripts
+
+Cada request e cada pasta têm dois scripts: um antes de enviar e um depois da resposta.
+
+```js
+// pré-requisição
+carom.set('nonce', Date.now());
+carom.header('X-Nonce', carom.get('nonce'));
+
+// pós-resposta
+const body = carom.json();
+carom.set('token', body.access_token);
+```
+
+Os de pasta rodam em volta dos da request: os pré de fora para dentro, os pós de dentro para
+fora. O que um script escreve com `carom.set` vai para o ambiente ativo, então dura até a
+próxima requisição. `console.log` e `pm.test` aparecem na aba **Console** do painel de
+resposta.
+
+O `pm` do Postman também funciona (`pm.environment.set`, `pm.response.json()`,
+`pm.test`, `pm.expect`, `pm.request.headers.add`), para um script importado rodar sem ser
+reescrito.
+
+> **Scripts não rodam isolados.** São JavaScript com acesso a tudo que o app alcança,
+> incluindo a rede. Leia os scripts de uma coleção que você não escreveu antes de enviar
+> qualquer requisição dela.
 
 ## Rodar no navegador
 

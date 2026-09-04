@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Braces, ChevronDown, ChevronRight, Copy, Download, FilePlus2, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronRight, Copy, Download, FilePlus2, FolderInput, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { PromptDialog } from '@/components/common/PromptDialog';
 import { downloadJson } from '@/lib/download';
@@ -17,7 +17,7 @@ type PromptState =
   | { kind: 'rename-request'; request: RequestRecord }
   | null;
 
-export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () => void; onFolderVariables: (folderId: string) => void }) {
+export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () => void; onImportPostman: () => void }) {
   const { state, dispatch } = useWorkspace();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -42,6 +42,16 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
     });
   };
 
+  /**
+   * Clicking a folder does both things it plausibly means: it shows what is
+   * inside, and it opens the folder's own pane — where its variables, auth and
+   * scripts live. Before this, that pane was only reachable by right-clicking.
+   */
+  const openFolder = (folderId: string, isOpen: boolean) => {
+    setCollapsed((current) => ({ ...current, [folderId]: isOpen }));
+    dispatch({ type: 'folder/open', id: folderId });
+  };
+
   const saveFolder = (folder: Folder) => {
     const payload = exportFolder(state, folder.id);
     if (payload) downloadJson(exportFileName(folder.name), payload);
@@ -56,7 +66,7 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
     { kind: 'item', label: 'New request', icon: <FilePlus2 size={13} />, onSelect: () => addRequest(folder.id) },
     { kind: 'item', label: 'New folder', icon: <FolderPlus size={13} />, onSelect: () => setPrompt({ kind: 'new-folder', parentId: folder.id }) },
     { kind: 'separator' },
-    { kind: 'item', label: 'Folder variables', icon: <Braces size={13} />, onSelect: () => onFolderVariables(folder.id) },
+    { kind: 'item', label: 'Folder settings', icon: <Braces size={13} />, onSelect: () => dispatch({ type: 'folder/open', id: folder.id }) },
     { kind: 'item', label: 'Rename', icon: <Pencil size={13} />, onSelect: () => setPrompt({ kind: 'rename-folder', folder }) },
     {
       kind: 'item',
@@ -176,9 +186,9 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
       return (
         <div key={folder.id}>
           <div
-            className={`tree-row ${dragging?.id === folder.id ? 'dragging' : ''} ${
-              dropTarget === `into:${folder.id}` ? 'drop-into' : ''
-            }`}
+            className={`tree-row ${folder.id === state.activeFolderId ? 'selected' : ''} ${
+              dragging?.id === folder.id ? 'dragging' : ''
+            } ${dropTarget === `into:${folder.id}` ? 'drop-into' : ''}`}
             style={{ paddingLeft: 4 + node.depth * 12 }}
             role="button"
             tabIndex={0}
@@ -210,11 +220,11 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
               setCollapsed((current) => ({ ...current, [folder.id]: false }));
               handleDrop(folder.id);
             }}
-            onClick={() => setCollapsed((current) => ({ ...current, [folder.id]: isOpen }))}
+            onClick={() => openFolder(folder.id, isOpen)}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                setCollapsed((current) => ({ ...current, [folder.id]: isOpen }));
+                openFolder(folder.id, isOpen);
               }
             }}
             onContextMenu={(event) => openMenu(event, folderMenu(folder))}
@@ -295,6 +305,9 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
       <div className="sidebar-foot">
         <button className="btn btn-sm btn-ghost" onClick={onImportCurl} data-testid="button-import-curl">
           <Terminal size={13} /> Import curl
+        </button>
+        <button className="btn btn-sm btn-ghost" onClick={onImportPostman} data-testid="button-import-postman">
+          <FolderInput size={13} /> Import Postman
         </button>
       </div>
 

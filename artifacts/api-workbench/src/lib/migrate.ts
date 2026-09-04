@@ -128,6 +128,7 @@ export function migrateLegacyState(): WorkspaceState | null {
     activeWorkspaceId: workspace.id,
     activeEnvironmentId: environments[1]?.id ?? null,
     openTabIds: requests[0] ? [requests[0].id] : [],
+    activeFolderId: null,
     activeRequestId: requests[0]?.id ?? null,
     settings: defaultSettings(),
   };

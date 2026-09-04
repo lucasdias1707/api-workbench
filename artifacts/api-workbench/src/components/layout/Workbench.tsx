@@ -3,6 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import {
   Columns2,
   FilePlus2,
+  FolderInput,
   Keyboard,
   Layers,
   PanelLeft,
@@ -12,12 +13,14 @@ import {
   Terminal,
 } from 'lucide-react';
 import { CommandPalette, type Command } from '@/components/dialogs/CommandPalette';
-import { FolderVariablesDialog } from '@/components/dialogs/FolderVariablesDialog';
 import { EnvironmentDialog } from '@/components/dialogs/EnvironmentDialog';
 import { ImportCurlDialog } from '@/components/dialogs/ImportCurlDialog';
+import { ImportPostmanDialog } from '@/components/dialogs/ImportPostmanDialog';
 import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { ShortcutsDialog } from '@/components/dialogs/ShortcutsDialog';
 import { EnvironmentPicker } from '@/components/layout/EnvironmentPicker';
+import { FolderPane } from '@/components/layout/FolderPane';
+import { UpdateBadge } from '@/components/layout/UpdateBadge';
 import { TabStrip } from '@/components/layout/TabStrip';
 import { RequestPane } from '@/components/request/RequestPane';
 import { ResponsePane } from '@/components/response/ResponsePane';
@@ -30,16 +33,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { createRequest } from '@/lib/factories';
 import { useWorkspace } from '@/state/workspace-store';
 
-type Overlay = 'palette' | 'environments' | 'settings' | 'curl' | 'shortcuts' | null;
+type Overlay = 'palette' | 'environments' | 'settings' | 'curl' | 'postman' | 'shortcuts' | null;
 
 export function Workbench() {
-  const { state, dispatch, activeRequest } = useWorkspace();
+  const { state, dispatch, activeRequest, activeFolder } = useWorkspace();
   const { toast } = useToast();
   const { status: proxyStatus } = useProxyHealth();
-  const { sending, send, cancel } = useSendRequest(proxyStatus);
+  const { sending, send, cancel, scriptLogs, scriptTests } = useSendRequest(proxyStatus);
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [folderVariables, setFolderVariables] = useState<string | null>(null);
 
   useTheme(state.settings.theme);
 
@@ -88,6 +90,7 @@ export function Workbench() {
     { id: 'send', label: 'Send request', icon: <Send size={13} />, hint: `${MOD_LABEL} ⏎`, run: sendActive },
     { id: 'environments', label: 'Edit environments', icon: <Layers size={13} />, hint: `${MOD_LABEL} E`, run: () => setOverlay('environments') },
     { id: 'import-curl', label: 'Import from curl', icon: <Terminal size={13} />, run: () => setOverlay('curl') },
+    { id: 'import-postman', label: 'Import a Postman collection', icon: <FolderInput size={13} />, run: () => setOverlay('postman') },
     { id: 'settings', label: 'Settings', icon: <Settings size={13} />, hint: `${MOD_LABEL} ,`, run: () => setOverlay('settings') },
     { id: 'shortcuts', label: 'Keyboard shortcuts', icon: <Keyboard size={13} />, run: () => setOverlay('shortcuts') },
     {
@@ -117,7 +120,7 @@ export function Workbench() {
         } as React.CSSProperties
       }
     >
-      <Sidebar onImportCurl={() => setOverlay('curl')} onFolderVariables={setFolderVariables} />
+      <Sidebar onImportCurl={() => setOverlay('curl')} onImportPostman={() => setOverlay('postman')} />
 
       <main className="main">
         <div className="topbar">
@@ -158,6 +161,7 @@ export function Workbench() {
             >
               {state.settings.layout === 'horizontal' ? <Rows2 size={15} /> : <Columns2 size={15} />}
             </button>
+            <UpdateBadge onOpenSettings={() => setOverlay('settings')} />
             <button
               className="icon-btn"
               onClick={() => setOverlay('settings')}
@@ -170,7 +174,9 @@ export function Workbench() {
           </div>
         </div>
 
-        {activeRequest ? (
+        {activeFolder ? (
+          <FolderPane folder={activeFolder} />
+        ) : activeRequest ? (
           <PanelGroup
             className="panes"
             direction={state.settings.layout}
@@ -181,7 +187,12 @@ export function Workbench() {
             </Panel>
             <PanelResizeHandle className="pane-divider" />
             <Panel defaultSize={50} minSize={22} order={2}>
-              <ResponsePane requestId={activeRequest.id} sending={sending} />
+              <ResponsePane
+                requestId={activeRequest.id}
+                sending={sending}
+                scriptLogs={scriptLogs}
+                scriptTests={scriptTests}
+              />
             </Panel>
           </PanelGroup>
         ) : (
@@ -206,10 +217,8 @@ export function Workbench() {
       {overlay === 'environments' ? <EnvironmentDialog onClose={() => setOverlay(null)} /> : null}
       {overlay === 'settings' ? <SettingsDialog onClose={() => setOverlay(null)} proxyStatus={proxyStatus} /> : null}
       {overlay === 'curl' ? <ImportCurlDialog onClose={() => setOverlay(null)} /> : null}
+      {overlay === 'postman' ? <ImportPostmanDialog onClose={() => setOverlay(null)} /> : null}
       {overlay === 'shortcuts' ? <ShortcutsDialog onClose={() => setOverlay(null)} /> : null}
-      {folderVariables ? (
-        <FolderVariablesDialog folderId={folderVariables} onClose={() => setFolderVariables(null)} />
-      ) : null}
     </div>
   );
 }

@@ -145,6 +145,148 @@ describe('folder variables', () => {
   });
 });
 
+describe('the folder pane', () => {
+  it('opens a folder and steps out of the request that was open', () => {
+    // One pane, one occupant: showing both at once would mean two answers to
+    // "what am I looking at".
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const state = reducer(opened, { type: 'folder/open', id: opened.folders[0].id });
+    expect(state.activeFolderId).toBe(opened.folders[0].id);
+    expect(state.activeRequestId).toBeNull();
+  });
+
+  it('closes the folder pane when a request is opened again', () => {
+    const state = seed();
+    const withFolder = reducer(state, { type: 'folder/open', id: state.folders[0].id });
+    const next = reducer(withFolder, { type: 'request/open', id: state.requests[0].id });
+    expect(next.activeFolderId).toBeNull();
+    expect(next.activeRequestId).toBe(state.requests[0].id);
+  });
+
+  it('keeps the open tabs while a folder is being looked at', () => {
+    const state = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const next = reducer(state, { type: 'folder/open', id: state.folders[0].id });
+    expect(next.openTabIds).toEqual(state.openTabIds);
+  });
+
+  it('patches whatever the pane edits', () => {
+    const state = seed();
+    const folder = state.folders[0];
+    const next = reducer(state, {
+      type: 'folder/update',
+      id: folder.id,
+      patch: { name: 'Renamed', preScript: "carom.set('a', '1')" },
+    });
+    expect(next.folders.find((item) => item.id === folder.id)).toMatchObject({
+      name: 'Renamed',
+      preScript: "carom.set('a', '1')",
+    });
+  });
+
+  it('closes the pane when the folder it was showing is deleted', () => {
+    const state = seed();
+    const folder = state.folders[0];
+    const opened = reducer(state, { type: 'folder/open', id: folder.id });
+    expect(reducer(opened, { type: 'folder/delete', id: folder.id }).activeFolderId).toBeNull();
+  });
+
+  it('closes the pane when the folder is deleted with its parent', () => {
+    const state = seed();
+    const parent = state.folders[0];
+    const child = createFolder(state.activeWorkspaceId, 'Nested', parent.id, 9);
+    const withChild = reducer({ ...state, folders: [...state.folders, child] }, { type: 'folder/open', id: child.id });
+    expect(reducer(withChild, { type: 'folder/delete', id: parent.id }).activeFolderId).toBeNull();
+  });
+
+  it("leaves another folder's pane alone when a sibling is deleted", () => {
+    const state = seed();
+    const kept = state.folders[0];
+    const doomed = createFolder(state.activeWorkspaceId, 'Doomed', null, 9);
+    const opened = reducer({ ...state, folders: [...state.folders, doomed] }, { type: 'folder/open', id: kept.id });
+    expect(reducer(opened, { type: 'folder/delete', id: doomed.id }).activeFolderId).toBe(kept.id);
+  });
+});
+
+describe('importing a tree', () => {
+  it('appends folders, requests and the environment in one step', () => {
+    const state = seed();
+    const folder = createFolder(state.activeWorkspaceId, 'Imported', null, 0);
+    const request = createRequest({ workspaceId: state.activeWorkspaceId, folderId: folder.id, name: 'Ping' });
+    const environment = createEnvironment(state.activeWorkspaceId, 'Staging', false, [row('a', '1')]);
+    const next = reducer(state, { type: 'import/merge', folders: [folder], requests: [request], environment });
+
+    expect(next.folders).toHaveLength(state.folders.length + 1);
+    expect(next.requests).toHaveLength(state.requests.length + 1);
+    expect(next.environments).toHaveLength(state.environments.length + 1);
+  });
+
+  it('opens what was just imported instead of leaving it to be found', () => {
+    const state = seed();
+    const folder = createFolder(state.activeWorkspaceId, 'Imported', null, 0);
+    const next = reducer(state, { type: 'import/merge', folders: [folder], requests: [], environment: null });
+    expect(next.activeFolderId).toBe(folder.id);
+  });
+
+  it('creates the destination workspace and moves into it', () => {
+    const state = seed();
+    const workspace = createWorkspace('Imported');
+    const folder = createFolder(workspace.id, 'Acme API', null, 0);
+    const next = reducer(state, {
+      type: 'import/merge',
+      folders: [folder],
+      requests: [],
+      environment: null,
+      workspace,
+      baseEnvironment: createEnvironment(workspace.id, 'Base', true, []),
+      workspaceId: workspace.id,
+    });
+
+    expect(next.workspaces.map((item) => item.name)).toContain('Imported');
+    expect(next.activeWorkspaceId).toBe(workspace.id);
+    expect(next.environments.filter((item) => item.workspaceId === workspace.id)).toHaveLength(1);
+    expect(next.activeFolderId).toBe(folder.id);
+  });
+
+  it("leaves the old workspace's tabs behind when the import lands elsewhere", () => {
+    // A tab belongs to the workspace it was opened from; carrying it across
+    // would show a request that is not in the tree any more.
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const workspace = createWorkspace('Imported');
+    const next = reducer(opened, {
+      type: 'import/merge',
+      folders: [createFolder(workspace.id, 'Acme API', null, 0)],
+      requests: [],
+      environment: null,
+      workspace,
+      baseEnvironment: createEnvironment(workspace.id, 'Base', true, []),
+      workspaceId: workspace.id,
+    });
+    expect(next.openTabIds).toEqual([]);
+    expect(next.activeRequestId).toBeNull();
+  });
+
+  it('stays put when the destination is the workspace already open', () => {
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const next = reducer(opened, {
+      type: 'import/merge',
+      folders: [],
+      requests: [],
+      environment: null,
+      workspaceId: opened.activeWorkspaceId,
+    });
+    expect(next.openTabIds).toEqual(opened.openTabIds);
+    expect(next.activeWorkspaceId).toBe(opened.activeWorkspaceId);
+  });
+
+  it('changes nothing about the view when only an environment came in', () => {
+    const state = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const environment = createEnvironment(state.activeWorkspaceId, 'Staging', false, []);
+    const next = reducer(state, { type: 'import/merge', folders: [], requests: [], environment });
+    expect(next.activeRequestId).toBe(state.activeRequestId);
+    expect(next.activeFolderId).toBeNull();
+  });
+});
+
 describe('moving things around', () => {
   it('moves a request into another folder and renumbers the destination', () => {
     const state = seed();

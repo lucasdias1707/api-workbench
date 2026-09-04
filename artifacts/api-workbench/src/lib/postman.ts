@@ -1,4 +1,5 @@
 import { createEnvironment, createFolder, createRequest, emptyAuth, row } from '@/lib/factories';
+import { splitQuery, syncUrlParams } from '@/lib/query';
 import type { Auth, BodyType, Environment, Folder, HttpMethod, KeyValue, RequestRecord } from '@/types';
 import { HTTP_METHODS } from '@/types';
 
@@ -173,9 +174,23 @@ export function toUrl(url: PostmanUrl | undefined): { url: string; params: KeyVa
   const params = toRows(url.query);
 
   if (url.raw) {
-    // The query lives in the Params table; the URL keeps it too, exactly as a
-    // URL typed by hand does. `prepareRequest` reconciles the two.
-    return { url: url.raw, params };
+    // The query stays in the URL, and the table mirrors it — exactly as it
+    // does for a URL typed by hand.
+    //
+    // The mirrored rows have to be built by `syncUrlParams`, not by `toRows`,
+    // because a mirrored row is marked `source: 'url'` and a plain one is not.
+    // Importing plain rows produced a table the mirror did not recognise as
+    // its own, so on first opening the request it appended a second copy of
+    // every parameter: delete the mirrored pair and it came straight back,
+    // delete the imported pair and it did not.
+    //
+    // Anything Postman lists that the raw URL does not carry — a disabled
+    // parameter, which Postman keeps in `query` but leaves out of `raw` —
+    // stays a manual row, so unticking it survives.
+    const inUrl = splitQuery(url.raw).params;
+    const keysInUrl = new Set(inUrl.map((param) => param.key));
+    const manual = params.filter((param) => !param.enabled || !keysInUrl.has(param.key.trim()));
+    return { url: url.raw, params: syncUrlParams(manual, inUrl) };
   }
 
   const host = Array.isArray(url.host) ? url.host.join('.') : text(url.host);

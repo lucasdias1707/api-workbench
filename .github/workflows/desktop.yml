@@ -83,7 +83,7 @@ jobs:
           # macOS reports it as "damaged"; ad-hoc makes the signature valid, so
           # the first run is an "unidentified developer" prompt the user can
           # accept. Removing the prompt needs a paid Developer ID plus
-          # notarization -- see the Desktop section of replit.md.
+          # notarization -- see the Desktop section of ARCHITECTURE.md.
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
         with:
           projectPath: artifacts/api-workbench
@@ -92,29 +92,29 @@ jobs:
           # build without touching releases. Otherwise __VERSION__ comes from
           # tauri.conf.json, so the tag and the installers always agree.
           tagName: ${{ (github.ref_type == 'tag' || inputs.publish) && 'v__VERSION__' || '' }}
-          releaseName: Kavo v__VERSION__
+          releaseName: Carom v__VERSION__
           releaseBody: |
-            Kavo — a fast, keyboard-driven HTTP client.
+            Carom — a fast, keyboard-driven HTTP client.
 
             Requests are made natively on the desktop, so there is no CORS
             restriction and hosts on your own network are reachable.
 
             | Platform | File |
             | --- | --- |
-            | macOS (Apple Silicon) | `Kavo_*_aarch64.dmg` |
-            | macOS (Intel) | `Kavo_*_x64.dmg` |
+            | macOS (Apple Silicon) | `Carom_*_aarch64.dmg` |
+            | macOS (Intel) | `Carom_*_x64.dmg` |
             | Windows | `.msi` or `.exe` |
             | Linux | `.AppImage`, `.deb` or `.rpm` |
 
             ### First run on macOS
 
-            macOS says it "could not verify Kavo is free of malware". The
+            macOS says it "could not verify Carom is free of malware". The
             bundles are signed ad-hoc, not with a paid Apple Developer ID, so
-            Gatekeeper cannot attest to the publisher. Drag Kavo to
+            Gatekeeper cannot attest to the publisher. Drag Carom to
             Applications, then either run:
 
             ```sh
-            xattr -cr /Applications/Kavo.app
+            xattr -cr /Applications/Carom.app
             ```
 
             or click **OK** on the warning and go to **System Settings ->
@@ -145,7 +145,7 @@ jobs:
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
-          name: kavo-${{ matrix.name }}
+          name: carom-${{ matrix.name }}
           path: artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           if-no-files-found: warn
           retention-days: 14

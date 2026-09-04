@@ -1,4 +1,4 @@
-# Kavo
+# Carom
 
 Um cliente HTTP no estilo desktop — inspirado no Yaak — para compor, organizar e enviar
 requisições com foco em teclado, tema escuro e leitura clara da resposta.
@@ -9,8 +9,8 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — sobe o servidor de apoio (porta 8080, ver `artifact.toml`)
-- `pnpm --filter @workspace/api-workbench run dev` — sobe o frontend
+- `pnpm --filter @workspace/api-server run dev` — sobe o servidor de apoio (`PORT=8080`)
+- `pnpm --filter @workspace/api-workbench run dev` — sobe o frontend (`PORT=21728`, `BASE_PATH=/`)
 - `pnpm run check` — typecheck + testes de todos os pacotes
 - `pnpm run test` — apenas os testes (Vitest)
 - `pnpm run typecheck` — typecheck completo
@@ -134,8 +134,14 @@ _Nenhuma preferência persistente registrada._
 
 ## Desktop
 
-O app se chama **Kavo** (os pacotes do workspace seguem com o nome `api-workbench`,
+O app se chama **Carom** (os pacotes do workspace seguem com o nome `api-workbench`,
 que é estrutura de repositório e não produto).
+
+Até a `v0.1.2` chamava-se Kavo. O renome levou junto o identificador do bundle
+(`dev.kavo.app` → `dev.carom.client`), que é o diretório de armazenamento da webview: quem
+vinha do Kavo começa com o workspace vazio e precisa exportar/importar. Trocar o
+identificador de novo tem o mesmo custo — não faça sem motivo. O sufixo `.app` saiu junto,
+que era do que o `tauri build` reclamava por colidir com a extensão de bundle do macOS.
 
 O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
 à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow
@@ -165,7 +171,7 @@ workflow) — isso não é cosmético: em Apple Silicon um `.app` arm64 *sem ass
 é rejeitado pelo Gatekeeper com a mensagem "está danificado e não pode ser aberto", que
 parece corrupção de download mas é falha de validação. Com ad-hoc a assinatura é válida e o
 primeiro run vira o aviso de que a Apple não conseguiu verificar o app, que dá para aceitar
-(`xattr -cr /Applications/Kavo.app`, ou Ajustes do Sistema → Privacidade e Segurança →
+(`xattr -cr /Applications/Carom.app`, ou Ajustes do Sistema → Privacidade e Segurança →
 Abrir Mesmo Assim; botão direito → Abrir não vale mais no macOS recente). O passo a passo
 para quem instala está no README. O step `Verify macOS signature` roda `codesign -dv` e
 `codesign --verify` no bundle e deixa a prova no log.

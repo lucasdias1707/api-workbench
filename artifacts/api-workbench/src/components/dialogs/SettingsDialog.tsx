@@ -48,7 +48,7 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
     try {
       const parsed = JSON.parse(await file.text()) as WorkspaceState;
       if (!Array.isArray(parsed.requests) || !Array.isArray(parsed.environments)) {
-        throw new Error('That file is not a Kavo export.');
+        throw new Error('That file is not a Carom export.');
       }
       dispatch({ type: 'state/replace', state: { ...parsed, responses: parsed.responses ?? [] } });
       toast({ title: 'Workspace imported', description: `${parsed.requests.length} requests loaded.`, kind: 'success' });
@@ -239,7 +239,7 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
           <span className="brand-mark" style={{ width: 18, height: 18 }}>
             <Zap size={11} strokeWidth={2.6} />
           </span>
-          <strong>Kavo</strong>
+          <strong>Carom</strong>
           <span className="mono">{APP_VERSION}</span>
           <span className="spacer" />
           <span>{isDesktop() ? 'desktop' : 'web'}</span>

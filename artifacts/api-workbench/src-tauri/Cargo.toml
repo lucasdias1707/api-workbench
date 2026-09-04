@@ -1,13 +1,13 @@
 [package]
-name = "kavo"
-version = "0.1.2"
-description = "Kavo — a fast, keyboard-driven HTTP client"
-authors = ["Kavo"]
+name = "carom"
+version = "0.2.0"
+description = "Carom — a fast, keyboard-driven HTTP client"
+authors = ["Carom"]
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "kavo_lib"
+name = "carom_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

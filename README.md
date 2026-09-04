@@ -1,4 +1,4 @@
-# Kavo
+# Carom
 
 Cliente HTTP de desktop — inspirado no Yaak — para compor, organizar e enviar requisições.
 Tema escuro, navegação por teclado, variáveis com escopo por pasta e ambiente, e leitura
@@ -7,18 +7,31 @@ clara da resposta.
 No app desktop as requisições saem nativamente: não há CORS, e `localhost`, IPs da sua rede
 e serviços internos são alcançáveis como em qualquer cliente nativo.
 
+## Vindo do Kavo (v0.1.x)?
+
+O app se chamava **Kavo** até a `v0.1.2` e mudou de nome na `v0.2.0`. A troca leva junto o
+identificador do bundle, que é o que nomeia a pasta de armazenamento da webview — ou seja,
+**o Carom começa vazio, sem as requisições que você tinha no Kavo.** Nada é apagado: os
+dados do Kavo continuam onde estavam, só não são visíveis para o app novo.
+
+Para levar tudo:
+
+1. Abra o **Kavo** antigo, vá em Settings e **exporte o workspace** (gera um JSON).
+2. Instale o Carom e **importe** esse JSON.
+3. Só então remova o Kavo, se quiser.
+
 ## Download
 
 Os instaladores estão em **[Releases](https://github.com/lucasdias1707/api-workbench/releases/latest)**.
 
 | Sistema | Arquivo |
 | --- | --- |
-| macOS Apple Silicon (M1/M2/M3/M4) | `Kavo_<versão>_aarch64.dmg` |
-| macOS Intel | `Kavo_<versão>_x64.dmg` |
-| Windows | `Kavo_<versão>_x64-setup.exe` ou `_x64_en-US.msi` |
-| Linux (Debian/Ubuntu) | `Kavo_<versão>_amd64.deb` |
-| Linux (Fedora/RHEL) | `Kavo-<versão>-1.x86_64.rpm` |
-| Linux (qualquer distro) | `Kavo_<versão>_amd64.AppImage` |
+| macOS Apple Silicon (M1/M2/M3/M4) | `Carom_<versão>_aarch64.dmg` |
+| macOS Intel | `Carom_<versão>_x64.dmg` |
+| Windows | `Carom_<versão>_x64-setup.exe` ou `_x64_en-US.msi` |
+| Linux (Debian/Ubuntu) | `Carom_<versão>_amd64.deb` |
+| Linux (Fedora/RHEL) | `Carom-<versão>-1.x86_64.rpm` |
+| Linux (qualquer distro) | `Carom_<versão>_amd64.AppImage` |
 
 ---
 
@@ -26,19 +39,19 @@ Os instaladores estão em **[Releases](https://github.com/lucasdias1707/api-work
 
 Na primeira abertura o macOS mostra:
 
-> **"A Apple não pôde verificar se o item Kavo está livre de algum malware."**
+> **"A Apple não pôde verificar se o item Carom está livre de algum malware."**
 
-Isso é esperado e **não** indica problema com o download. O Kavo é assinado, mas com uma
+Isso é esperado e **não** indica problema com o download. O Carom é assinado, mas com uma
 assinatura *ad-hoc* — não com um certificado Apple Developer ID pago. Sem esse certificado a
 Apple não tem como atestar a origem do app, então o Gatekeeper pede confirmação explícita.
 A liberação é feita uma única vez; depois o app abre com duplo clique como qualquer outro.
 
-Antes de qualquer coisa, arraste o **Kavo** do `.dmg` para a pasta **Aplicativos**.
+Antes de qualquer coisa, arraste o **Carom** do `.dmg` para a pasta **Aplicativos**.
 
 ### Opção 1 — Terminal (uma linha)
 
 ```sh
-xattr -cr /Applications/Kavo.app
+xattr -cr /Applications/Carom.app
 ```
 
 O comando remove o atributo `com.apple.quarantine`, que o navegador carimba em tudo que
@@ -46,16 +59,16 @@ baixa. Sem ele o Gatekeeper não intercepta a abertura. Abra o app normalmente e
 
 ### Opção 2 — pela interface, sem Terminal
 
-1. Dê duplo clique no Kavo. No aviso, clique em **OK** — **não** em "Mover para o Lixo".
+1. Dê duplo clique no Carom. No aviso, clique em **OK** — **não** em "Mover para o Lixo".
 2. Abra **Ajustes do Sistema → Privacidade e Segurança**.
-3. Role até o fim da página. Vai aparecer a linha *"Kavo foi bloqueado para proteger seu Mac"*
+3. Role até o fim da página. Vai aparecer a linha *"Carom foi bloqueado para proteger seu Mac"*
    com o botão **Abrir Mesmo Assim**.
 4. Clique nele, autentique com Touch ID ou senha, e confirme **Abrir** no diálogo seguinte.
 
 O antigo atalho de clicar com o botão direito e escolher "Abrir" não funciona mais nas
 versões recentes do macOS para este caso — use um dos dois caminhos acima.
 
-### "O item Kavo está danificado e não pode ser aberto"
+### "O item Carom está danificado e não pode ser aberto"
 
 Mensagem diferente, causa diferente: significa que o `.app` não tem assinatura **nenhuma**.
 No Apple Silicon todo executável arm64 precisa de assinatura para rodar, e o Gatekeeper
@@ -76,8 +89,8 @@ mesmo**.
 permissão de execução:
 
 ```sh
-chmod +x Kavo_*_amd64.AppImage
-./Kavo_*_amd64.AppImage
+chmod +x Carom_*_amd64.AppImage
+./Carom_*_amd64.AppImage
 ```
 
 Dependências de sistema: `libwebkit2gtk-4.1-0` e `libgtk-3-0` (o `.deb` e o `.rpm` já
@@ -127,7 +140,7 @@ Para compilar o desktop no Linux é preciso Rust e as libs de sistema:
 `libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf`.
 
 Detalhes de arquitetura, variáveis de ambiente e decisões de projeto estão em
-[`replit.md`](./replit.md).
+[`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## Publicar uma versão
 

@@ -6,5 +6,5 @@ pub fn run() {
         // hosts directly. Scope is declared in capabilities/default.json.
         .plugin(tauri_plugin_http::init())
         .run(tauri::generate_context!())
-        .expect("error while running Kavo");
+        .expect("error while running Carom");
 }

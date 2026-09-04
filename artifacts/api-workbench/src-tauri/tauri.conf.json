@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Kavo",
-  "version": "0.1.2",
-  "identifier": "dev.kavo.app",
+  "productName": "Carom",
+  "version": "0.2.0",
+  "identifier": "dev.carom.client",
   "build": {
     "beforeDevCommand": "pnpm run dev:tauri",
     "devUrl": "http://localhost:21728",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kavo",
+        "title": "Carom",
         "width": 1280,
         "height": 820,
         "minWidth": 720,
@@ -37,7 +37,7 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "Kavo — HTTP client",
-    "longDescription": "Kavo composes, organises and sends HTTP requests, with collections, environments and a readable response viewer."
+    "shortDescription": "Carom — HTTP client",
+    "longDescription": "Carom composes, organises and sends HTTP requests, with collections, environments and a readable response viewer."
   }
 }

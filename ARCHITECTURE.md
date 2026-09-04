@@ -329,9 +329,16 @@ Duas consequências que o código precisa respeitar:
 - **Um draft não tem tag.** O GitHub só cria a tag quando o draft é publicado, então
   `GET /releases/tags/{tag}` responde 404 para ele. O compositor cai para a listagem de
   releases, que inclui drafts para quem está autenticado e já traz o `tag_name` futuro.
+- **E, pela mesma razão, as URLs não podem vir da API.** Sem tag, o `browser_download_url`
+  de cada asset é um placeholder `untagged-<hash>` que morre no instante em que a release é
+  publicada sob a tag real. Foi assim que a **v0.4.1 saiu com as quatro plataformas presentes
+  e as quatro URLs dando 404**. O compositor monta a URL a partir da tag
+  (`releases/download/{tag}/{nome}`), que é o que ela vira quando publica — correta para
+  draft e para release publicada.
 - **O manifesto publicado é verificado contra a release**, não presumido: o último passo
-  baixa `releases/latest/download/latest.json` e falha se a versão não bater ou se faltar
-  alguma das quatro plataformas.
+  baixa `releases/latest/download/latest.json`, confere a versão, e **busca cada uma das
+  quatro URLs**. Conferir só que as chaves existem não bastou — foi exatamente o estado em
+  que a v0.4.1 passou.
 
 ### Assinatura (macOS e Windows)
 

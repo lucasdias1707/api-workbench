@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchRelease } from '../compose-updater-manifest.js';
+import { fetchRelease, toReleaseAssets } from '../compose-updater-manifest.js';
 import {
   buildManifest,
   platformFor,
@@ -208,5 +208,40 @@ describe('finding the release, draft included', () => {
     const send = (async (url: string | URL | Request) =>
       String(url).includes('/releases/tags/') ? respond(404, {}) : respond(200, [])) as unknown as typeof fetch;
     await expect(fetchRelease('owner/repo', 'v1.0.0', send)).rejects.toThrow(/No release found for v1.0.0/);
+  });
+});
+
+describe('the URLs the manifest points at', () => {
+  const apiAsset = (name: string, browser_download_url: string) => ({
+    name,
+    browser_download_url,
+    url: `https://api.github.com/repos/o/r/releases/assets/${name}`,
+  });
+
+  it('builds them from the tag rather than trusting the API', () => {
+    const assets = toReleaseAssets('o/r', 'v1.2.3', [
+      apiAsset('Carom_1.2.3_x64-setup.exe', 'https://github.com/o/r/releases/download/v1.2.3/Carom_1.2.3_x64-setup.exe'),
+    ]);
+    expect(assets[0].url).toBe('https://github.com/o/r/releases/download/v1.2.3/Carom_1.2.3_x64-setup.exe');
+  });
+
+  it('ignores an untagged placeholder, which is what a draft reports', () => {
+    // This is the v0.4.1 bug: the composer runs against a draft, a draft has
+    // no tag, and GitHub hands back `untagged-<hash>` paths that 404 as soon
+    // as the release is published. Every platform key was present, so nothing
+    // caught it until a download was actually tried.
+    const assets = toReleaseAssets('o/r', 'v1.2.3', [
+      apiAsset(
+        'Carom_aarch64.app.tar.gz',
+        'https://github.com/o/r/releases/download/untagged-fef3e468d5da23d86316/Carom_aarch64.app.tar.gz',
+      ),
+    ]);
+    expect(assets[0].url).not.toContain('untagged-');
+    expect(assets[0].url).toBe('https://github.com/o/r/releases/download/v1.2.3/Carom_aarch64.app.tar.gz');
+  });
+
+  it('keeps the asset names untouched, since the platform is read off them', () => {
+    const names = ['Carom_0.5.0_amd64.AppImage', 'Carom_x64.app.tar.gz'];
+    expect(toReleaseAssets('o/r', 'v0.5.0', names.map((n) => apiAsset(n, 'ignored'))).map((a) => a.name)).toEqual(names);
   });
 });

@@ -158,11 +158,11 @@ _Nenhuma preferência persistente registrada._
 O app se chama **Carom** (os pacotes do workspace seguem com o nome `api-workbench`,
 que é estrutura de repositório e não produto).
 
-Até a `v0.1.2` chamava-se Kavo. O renome levou junto o identificador do bundle
-(`dev.kavo.app` → `dev.carom.client`), que é o diretório de armazenamento da webview: quem
-vinha do Kavo começa com o workspace vazio e precisa exportar/importar. Trocar o
-identificador de novo tem o mesmo custo — não faça sem motivo. O sufixo `.app` saiu junto,
-que era do que o `tauri build` reclamava por colidir com a extensão de bundle do macOS.
+O identificador do bundle é `dev.carom.client`, e **trocá-lo apaga os dados de todo mundo na
+prática**: é ele que nomeia o diretório de armazenamento da webview, então um identificador
+novo abre um workspace vazio e obriga cada pessoa a exportar do app antigo e importar no
+novo. Já aconteceu uma vez, num renome; não faça sem motivo forte. Ele também não pode
+terminar em `.app`, que colide com a extensão de bundle do macOS e o `tauri build` reclama.
 
 O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
 à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow

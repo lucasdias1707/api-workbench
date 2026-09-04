@@ -7,19 +7,6 @@ clara da resposta.
 No app desktop as requisições saem nativamente: não há CORS, e `localhost`, IPs da sua rede
 e serviços internos são alcançáveis como em qualquer cliente nativo.
 
-## Vindo do Kavo (v0.1.x)?
-
-O app se chamava **Kavo** até a `v0.1.2` e mudou de nome na `v0.2.0`. A troca leva junto o
-identificador do bundle, que é o que nomeia a pasta de armazenamento da webview — ou seja,
-**o Carom começa vazio, sem as requisições que você tinha no Kavo.** Nada é apagado: os
-dados do Kavo continuam onde estavam, só não são visíveis para o app novo.
-
-Para levar tudo:
-
-1. Abra o **Kavo** antigo, vá em Settings e **exporte o workspace** (gera um JSON).
-2. Instale o Carom e **importe** esse JSON.
-3. Só então remova o Kavo, se quiser.
-
 ## Download
 
 Os instaladores estão em **[Releases](https://github.com/lucasdias1707/carom-client-api/releases/latest)**.
@@ -68,18 +55,11 @@ baixa. Sem ele o Gatekeeper não intercepta a abertura. Abra o app normalmente e
 O antigo atalho de clicar com o botão direito e escolher "Abrir" não funciona mais nas
 versões recentes do macOS para este caso — use um dos dois caminhos acima.
 
-### "O item Carom está danificado e não pode ser aberto"
-
-Mensagem diferente, causa diferente: significa que o `.app` não tem assinatura **nenhuma**.
-No Apple Silicon todo executável arm64 precisa de assinatura para rodar, e o Gatekeeper
-relata a ausência dela como se o arquivo estivesse corrompido. Só a versão `v0.1.0` tem esse
-problema — **baixe a release mais recente**, que já sai assinada ad-hoc pelo CI.
-
 ---
 
 ## Atualização
 
-A partir da `v0.3.0` o Carom se atualiza sozinho. Ao abrir, ele consulta as releases deste
+A partir da `v0.2.0` o Carom se atualiza sozinho. Ao abrir, ele consulta as releases deste
 repositório; se houver versão nova, aparece um aviso em **Settings → Updates** com as notas
 da versão e um botão **Download and install**. O download só acontece se você clicar —
 nunca sozinho. Terminando, é um clique em **Restart now** e pronto.
@@ -89,8 +69,8 @@ clicar em **Check now**.
 
 Dois detalhes:
 
-- **A primeira versão com updater ainda é instalação manual.** Quem está na `v0.1.x` ou
-  `v0.2.0` precisa baixar uma vez à mão; o automático vale da seguinte em diante.
+- **A `v0.2.0` é instalação manual**, por ser a primeira a trazer o updater. Dela em diante
+  o automático funciona.
 - **`.deb` e `.rpm` não se atualizam sozinhos.** Esses arquivos pertencem ao gerenciador de
   pacotes da distro, e o app sobrescrevê-los deixaria o sistema com um registro errado do que
   está instalado. Nesse caso o Carom detecta a situação, avisa que há versão nova e manda

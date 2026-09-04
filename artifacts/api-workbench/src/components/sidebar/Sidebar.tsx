@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Braces, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, FilePlus2, FolderInput, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, FilePlus2, FolderInput, FolderPlus, PanelLeftClose, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
+import { MOD_LABEL } from '@/hooks/use-hotkeys';
 import { PromptDialog } from '@/components/common/PromptDialog';
 import { downloadJson } from '@/lib/download';
 import { exportFileName, exportFolder, exportRequest } from '@/lib/export';
@@ -21,7 +22,15 @@ type PromptState =
 
 type ConfirmState = { kind: 'folder'; folder: Folder } | { kind: 'request'; request: RequestRecord } | null;
 
-export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () => void; onImportPostman: () => void }) {
+export function Sidebar({
+  onImportCurl,
+  onImportPostman,
+  onCollapse,
+}: {
+  onImportCurl: () => void;
+  onImportPostman: () => void;
+  onCollapse: () => void;
+}) {
   const { state, dispatch } = useWorkspace();
   const deleteWithUndo = useDeleteWithUndo();
   const [search, setSearch] = useState('');
@@ -314,6 +323,21 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
           data-testid="button-new-request"
         >
           <FilePlus2 size={15} />
+        </button>
+        {/*
+          The top bar has a toggle too, but on a narrow window the sidebar
+          covers the top bar — so the control that hides it has to live inside
+          the thing being hidden, or it cannot be reached at exactly the width
+          where it is most needed.
+        */}
+        <button
+          className="icon-btn"
+          onClick={onCollapse}
+          title={`Hide the sidebar (${MOD_LABEL} B)`}
+          aria-label="Hide the sidebar"
+          data-testid="button-collapse-sidebar"
+        >
+          <PanelLeftClose size={15} />
         </button>
       </div>
 

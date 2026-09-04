@@ -1,3 +1,4 @@
+import { DEFAULT_SIDEBAR_WIDTH } from '@/lib/sidebar';
 import type { JsonTheme, Settings } from '@/types';
 
 /** Named starting points for the response viewer's syntax colours. */
@@ -49,6 +50,8 @@ export function defaultSettings(): Settings {
     timeoutMs: 30_000,
     persistResponses: true,
     autoCheckUpdates: true,
+    sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+    sidebarCollapsed: false,
     jsonTheme: defaultJsonTheme(),
   };
 }

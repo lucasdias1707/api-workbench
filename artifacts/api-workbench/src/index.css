@@ -142,6 +142,7 @@ input, textarea, select { background: none; border: 0; }
    ========================================================================== */
 
 .workbench {
+  position: relative;
   display: grid;
   grid-template-columns: var(--sidebar-w) 1fr;
   height: 100dvh;
@@ -150,7 +151,43 @@ input, textarea, select { background: none; border: 0; }
 .workbench[data-sidebar='hidden'] { grid-template-columns: 0 1fr; }
 .workbench[data-sidebar='hidden'] .sidebar { display: none; }
 
+/* Taken out of the grid on purpose. As a third track it changed how many
+   in-flow children the grid had — and since the sidebar is `position: fixed`
+   on a narrow window, the main pane then landed in the first column and came
+   out zero pixels wide. Positioned over the seam instead, the grid is the same
+   two columns it always was.
+
+   Wider than it looks, too: the visible line is 1px, the grab area is 9px,
+   because a 1px target is a test of aim rather than an affordance. */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--sidebar-w);
+  width: 9px;
+  margin-left: -4px;
+  z-index: 20;
+  cursor: col-resize;
+  touch-action: none;
+}
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 4px;
+  background: transparent;
+  transition: background 0.12s ease-out;
+}
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after { background: var(--accent); }
+.sidebar-resizer:focus-visible { outline: none; }
+
 .main {
+  /* Pinned to the second track rather than left to implicit placement. The
+     sidebar leaves the flow in two different ways — `display: none` when
+     collapsed, `position: fixed` on a narrow window — and either one made the
+     main pane the first in-flow child, so it landed in the sidebar's own
+     zero-width column and rendered one pixel wide. */
+  grid-column: 2;
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -1213,12 +1250,18 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
 .mobile-only { display: none; }
 
 @media (max-width: 900px) {
-  .workbench { grid-template-columns: 1fr; }
+  /* Still two tracks, the first empty: the sidebar floats over the content
+     here, so it needs no column, but the main pane still has to find its own. */
+  .workbench { grid-template-columns: 0 1fr; }
+  /* The seam it grabs is not there once the sidebar floats over the content. */
+  .sidebar-resizer { display: none; }
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: 30;
-    width: 280px;
+    /* The same width the handle sets, so resizing means the same thing at
+       every window size. */
+    width: var(--sidebar-w);
     border-right: 1px solid var(--border);
     transform: translateX(-100%);
     transition: transform 0.18s ease-out;

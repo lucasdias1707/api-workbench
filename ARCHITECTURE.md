@@ -284,6 +284,35 @@ A chave em uso é a minisign `8D6027C8903DED7`. Trocá-la ou apagá-la deixa tod
 existente sem caminho de update; `src/__tests__/tauri-config.test.ts` falha se ela sumir do
 config.
 
+### A release sai como draft, e só é publicada completa
+
+Cada job da matriz sobe o **seu próprio `latest.json`**, com uma plataforma só, e o
+`tauri-action` apaga e substitui asset de mesmo nome. Ou seja: entre o primeiro job terminar
+e o compositor rodar, existe uma janela de alguns minutos em que a release está publicada
+servindo um manifesto que descreve **uma** plataforma.
+
+Um app de qualquer outra plataforma que checar nessa janela recebe:
+
+> None of the fallback platforms `["windows-x86_64-nsis", "windows-x86_64"]` were found in
+> the response `platforms` object
+
+Foi exatamente o que aconteceu no Windows durante a v0.4.0: a release ficou visível às
+13:44:33, quando o job do macOS arm64 terminou, e o manifesto completo só chegou às 13:47:06.
+
+Por isso o `tauri-action` roda com `releaseDraft: true`. Um draft **não é**
+`releases/latest`, então nenhum app instalado consegue enxergá-lo; quem checa nesse período
+continua vendo a versão anterior, que é a verdade até a nova estar inteira. Quem publica é o
+job do manifesto, com `draft: false`, depois de anexar o `latest.json` completo.
+
+Duas consequências que o código precisa respeitar:
+
+- **Um draft não tem tag.** O GitHub só cria a tag quando o draft é publicado, então
+  `GET /releases/tags/{tag}` responde 404 para ele. O compositor cai para a listagem de
+  releases, que inclui drafts para quem está autenticado e já traz o `tag_name` futuro.
+- **O manifesto publicado é verificado contra a release**, não presumido: o último passo
+  baixa `releases/latest/download/latest.json` e falha se a versão não bater ou se faltar
+  alguma das quatro plataformas.
+
 ### Assinatura (macOS e Windows)
 
 Os bundles não são assinados com um certificado pago, então o sistema não reconhece o

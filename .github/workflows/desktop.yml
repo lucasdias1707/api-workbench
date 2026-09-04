@@ -186,7 +186,16 @@ jobs:
 
             Full instructions, and what it would take to remove the prompts,
             are in the [README](https://github.com/lucasdias1707/carom-client-api#readme).
-          releaseDraft: false
+          # Draft until the manifest is complete. Every matrix job uploads its
+          # own single-platform latest.json, each overwriting the last, so for
+          # the minutes between the first job finishing and the composer
+          # running, a published release serves a manifest describing one
+          # platform. An app on any other platform that checks in that window
+          # gets "none of the fallback platforms were found" -- which is what
+          # happened on Windows during the v0.4.0 release. A draft is not
+          # `releases/latest`, so nobody's updater can see the release until
+          # the composer publishes it complete.
+          releaseDraft: true
           prerelease: false
 
       # Proof in the log that the bundle carries a valid signature, which is
@@ -250,9 +259,36 @@ jobs:
             "$GITHUB_WORKSPACE/latest.json"
           cat "$GITHUB_WORKSPACE/latest.json"
 
-      # Last write wins, and this is the last write.
-      - name: Attach it to the release
+      # Last write wins, and this is the last write. `draft: false` is what
+      # publishes the release: until this step, it is not `releases/latest` and
+      # no installed app can reach it.
+      - name: Attach the manifest and publish the release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.compose.outputs.version }}
           files: latest.json
+          draft: false
+
+      # The manifest is the file every installed app reads to decide what to
+      # download, and it is served from a release that is now live. A missing
+      # platform here is invisible until someone on that platform tries to
+      # update, so it is checked against the release rather than trusted.
+      - name: Check the published manifest serves every platform
+        run: |
+          url=https://github.com/${{ github.repository }}/releases/latest/download/latest.json
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sSL -o published.json -w '%{http_code}' "$url" || true)
+            [ "$code" = "200" ] && break
+            echo "Attempt $attempt: HTTP $code, waiting for the asset to serve."
+            sleep 10
+          done
+          node -e '
+            const manifest = require("./published.json");
+            const want = ["darwin-aarch64", "darwin-x86_64", "linux-x86_64", "windows-x86_64"];
+            const missing = want.filter((key) => !manifest.platforms?.[key]?.url);
+            if (manifest.version !== "${{ steps.compose.outputs.version }}") {
+              throw new Error(`releases/latest serves ${manifest.version}, expected ${{ steps.compose.outputs.version }}`);
+            }
+            if (missing.length) throw new Error(`Published manifest is missing: ${missing.join(", ")}`);
+            console.log(`releases/latest serves ${manifest.version} for ${want.join(", ")}`);
+          '

@@ -10,11 +10,12 @@
  * the signatures come from there too.
  */
 import { writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { buildManifest, platformFor, type ReleaseAsset } from './updater-manifest.js';
 
 const API = 'https://api.github.com';
 
-type ApiAsset = { name: string; browser_download_url: string; url: string };
+export type ApiAsset = { name: string; browser_download_url: string; url: string };
 
 function headers(): Record<string, string> {
   const token = process.env.GITHUB_TOKEN;
@@ -25,12 +26,40 @@ function headers(): Record<string, string> {
   };
 }
 
-async function fetchRelease(repo: string, tag: string): Promise<{ assets: ApiAsset[]; body: string }> {
-  const response = await fetch(`${API}/repos/${repo}/releases/tags/${tag}`, { headers: headers() });
-  if (!response.ok) {
-    throw new Error(`Could not read release ${tag}: HTTP ${response.status} ${await response.text()}`);
+export type ApiRelease = { assets: ApiAsset[]; body: string; tag_name?: string; draft?: boolean };
+
+/**
+ * Find the release for a tag, draft included.
+ *
+ * The build publishes as a draft so that nobody's updater sees a half-built
+ * release, and a draft has no tag yet — GitHub creates the tag when the draft
+ * is published, so `releases/tags/{tag}` answers 404 for one. The listing
+ * endpoint does include drafts for an authenticated caller, and each carries
+ * the `tag_name` it will get, so that is the fallback.
+ */
+export async function fetchRelease(
+  repo: string,
+  tag: string,
+  send: typeof fetch = fetch,
+): Promise<ApiRelease> {
+  const byTag = await send(`${API}/repos/${repo}/releases/tags/${tag}`, { headers: headers() });
+  if (byTag.ok) return (await byTag.json()) as ApiRelease;
+  if (byTag.status !== 404) {
+    throw new Error(`Could not read release ${tag}: HTTP ${byTag.status} ${await byTag.text()}`);
   }
-  return (await response.json()) as { assets: ApiAsset[]; body: string };
+
+  const listed = await send(`${API}/repos/${repo}/releases?per_page=100`, { headers: headers() });
+  if (!listed.ok) {
+    throw new Error(`Could not list releases: HTTP ${listed.status} ${await listed.text()}`);
+  }
+  const releases = (await listed.json()) as ApiRelease[];
+  const draft = releases.find((release) => release.tag_name === tag);
+  if (!draft) {
+    throw new Error(
+      `No release found for ${tag}, published or draft. The build jobs create it, so this means none of them got that far.`,
+    );
+  }
+  return draft;
 }
 
 /**
@@ -83,4 +112,8 @@ async function main(): Promise<void> {
   console.log(`Wrote ${outFile} covering ${Object.keys(manifest.platforms).join(', ')}`);
 }
 
-await main();
+// Importable for its tests without running the CLI: `fetchRelease` is the part
+// that has to cope with a draft, and that is worth exercising without a network.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await main();
+}

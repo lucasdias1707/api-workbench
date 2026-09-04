@@ -32,8 +32,27 @@ export type UpdateApi = UpdateState & {
   download: () => void;
 };
 
+/**
+ * Whatever the failure carries, in a form worth showing.
+ *
+ * Tauri's plugins reject with a plain string as often as with an `Error`, so
+ * an `instanceof Error` check throws away the only useful part of most
+ * failures — which is exactly what happened to the first macOS update report.
+ */
 function detail(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : 'No further detail was given.';
+  if (typeof error === 'string' && error.trim()) return error.trim();
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === 'object') {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message.trim()) return message.trim();
+    try {
+      const json = JSON.stringify(error);
+      if (json && json !== '{}') return json;
+    } catch {
+      // A value that will not serialise tells us nothing anyway.
+    }
+  }
+  return 'No further detail was given.';
 }
 
 const IDLE: UpdateState = {

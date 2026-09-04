@@ -9,8 +9,6 @@ type UrlBarProps = {
   sending: boolean;
   onMethodChange: (method: HttpMethod) => void;
   onUrlChange: (url: string) => void;
-  /** Fired when the URL is done being edited, so its query can be extracted. */
-  onUrlCommit: (url: string) => void;
   onSend: () => void;
   onCancel: () => void;
 };
@@ -22,7 +20,6 @@ export function UrlBar({
   sending,
   onMethodChange,
   onUrlChange,
-  onUrlCommit,
   onSend,
   onCancel,
 }: UrlBarProps) {
@@ -46,7 +43,6 @@ export function UrlBar({
         value={url}
         table={variables}
         onChange={onUrlChange}
-        onCommit={onUrlCommit}
         onSubmit={onSend}
         placeholder="https://api.example.com/resource"
         ariaLabel="Request URL"

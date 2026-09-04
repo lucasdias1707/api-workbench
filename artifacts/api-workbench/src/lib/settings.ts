@@ -42,7 +42,7 @@ export function defaultJsonTheme(): JsonTheme {
 
 export function defaultSettings(): Settings {
   return {
-    theme: 'dark',
+    theme: 'system',
     layout: 'horizontal',
     sendMode: 'auto',
     followRedirects: true,

@@ -19,6 +19,12 @@ export type KeyValue = {
   key: string;
   value: string;
   enabled: boolean;
+  /**
+   * Set on query parameters mirrored out of the URL, so re-reading the URL can
+   * replace them without touching rows someone typed into the table. Absent on
+   * everything else, including every row written before this existed.
+   */
+  source?: 'url';
 };
 
 export type Auth = {

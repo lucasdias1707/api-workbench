@@ -1,5 +1,6 @@
 import { byteLength } from '@/lib/format';
 import { createId } from '@/lib/id';
+import { splitQuery } from '@/lib/query';
 import { interpolate } from '@/lib/template';
 import type { HttpMethod, KeyValue, RequestRecord, ResponseRecord, SendMode } from '@/types';
 
@@ -103,7 +104,25 @@ export function prepareRequest(request: RequestRecord, variables: Record<string,
     headers.push({ key: 'Content-Type', value: body.contentType });
   }
 
-  return { method: request.method, url: buildUrl(interpolate(request.url, variables), params), headers, body };
+  // The URL keeps the query someone typed into it, and the Params table
+  // mirrors it. Appending the table to that URL would send every mirrored
+  // parameter twice, so the address goes out without its query and the table
+  // supplies the whole query instead.
+  //
+  // A parameter the table has never heard of is still sent: the mirror is
+  // debounced and Send can beat it, and dropping what was just typed would be
+  // worse than sending it. The test is the key, not the whole pair — once the
+  // table has a row for `page`, that row is the one that counts, whether it
+  // was edited, unticked, or left alone.
+  const { base, params: fromUrl } = splitQuery(interpolate(request.url, variables));
+  const tableKeys = new Set(
+    request.params.map((param) => interpolate(param.key, variables).trim()).filter(Boolean),
+  );
+  for (const param of fromUrl) {
+    if (!tableKeys.has(param.key)) params.push(param);
+  }
+
+  return { method: request.method, url: buildUrl(base, params), headers, body };
 }
 
 /** Merge query parameters into a URL without losing ones already written by hand. */

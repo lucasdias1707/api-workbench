@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createRequest } from '@/lib/factories';
+import { prepareRequest } from '@/lib/http';
+import { paramsMatchUrl, splitQuery } from '@/lib/query';
 import {
   allIds,
   importPostman,
@@ -89,6 +92,66 @@ describe('toUrl', () => {
 
   it('accepts a plain string, which older exports use', () => {
     expect(toUrl('https://api.test/x')).toEqual({ url: 'https://api.test/x', params: [] });
+  });
+});
+
+describe('an imported request does not duplicate its query', () => {
+  /**
+   * The bug this pins: `toUrl` built the Params rows with `toRows`, which
+   * leaves them unmarked, so the URL mirror did not recognise them as its own
+   * and appended a second copy of every parameter the first time the request
+   * was opened. Deleting the mirrored pair brought it straight back; deleting
+   * the imported pair did not.
+   */
+  const imported = (raw: string, query: Array<{ key: string; value: string; disabled?: boolean }>) =>
+    toUrl({ raw, query });
+
+  it('marks the mirrored rows as coming from the URL', () => {
+    const { params } = imported('{{baseUrl}}/x?inicio=2025-06-01&fim=2025-06-30', [
+      { key: 'inicio', value: '2025-06-01' },
+      { key: 'fim', value: '2025-06-30' },
+    ]);
+    expect(params).toHaveLength(2);
+    expect(params.every((param) => param.source === 'url')).toBe(true);
+  });
+
+  it('leaves the mirror with nothing to do, which is what stops the duplication', () => {
+    const url = '{{baseUrl}}/inventario?inicio=2025-06-01&fim=2025-06-30';
+    const { params } = imported(url, [
+      { key: 'inicio', value: '2025-06-01' },
+      { key: 'fim', value: '2025-06-30' },
+    ]);
+    // This is the exact check RequestPane runs on a debounce before syncing.
+    expect(paramsMatchUrl(params, splitQuery(url).params)).toBe(true);
+  });
+
+  it('keeps a disabled parameter as a manual row, so unticking it survives', () => {
+    // Postman keeps a disabled parameter in `query` but leaves it out of `raw`,
+    // so marking it as mirrored would make the next sync delete it.
+    const { params } = imported('{{baseUrl}}/x?page=1', [
+      { key: 'page', value: '1' },
+      { key: 'debug', value: 'true', disabled: true },
+    ]);
+    const debug = params.find((param) => param.key === 'debug');
+    expect(debug).toMatchObject({ enabled: false });
+    expect(debug?.source).toBeUndefined();
+    expect(paramsMatchUrl(params, splitQuery('{{baseUrl}}/x?page=1').params)).toBe(true);
+  });
+
+  it('keeps a parameter Postman lists but the raw URL omits', () => {
+    const { params } = imported('{{baseUrl}}/x', [{ key: 'orphan', value: '1' }]);
+    expect(params.map((param) => param.key)).toEqual(['orphan']);
+    expect(params[0].source).toBeUndefined();
+  });
+
+  it('sends each imported parameter exactly once', () => {
+    const url = '{{baseUrl}}/x?inicio=2025-06-01&fim=2025-06-30';
+    const { params } = imported(url, [
+      { key: 'inicio', value: '2025-06-01' },
+      { key: 'fim', value: '2025-06-30' },
+    ]);
+    const sent = prepareRequest(createRequest({ workspaceId: 'w', url, params }), { baseUrl: 'https://api.test' }).url;
+    expect(sent).toBe('https://api.test/x?inicio=2025-06-01&fim=2025-06-30');
   });
 });
 

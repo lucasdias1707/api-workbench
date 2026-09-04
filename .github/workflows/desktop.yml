@@ -270,10 +270,11 @@ jobs:
           draft: false
 
       # The manifest is the file every installed app reads to decide what to
-      # download, and it is served from a release that is now live. A missing
-      # platform here is invisible until someone on that platform tries to
-      # update, so it is checked against the release rather than trusted.
-      - name: Check the published manifest serves every platform
+      # download, and it is served from a release that is now live. Checking
+      # that the four keys exist is not enough: v0.4.1 shipped a manifest with
+      # all four present and every URL 404ing, because a draft release reports
+      # `untagged-<hash>` download paths. So every URL is fetched too.
+      - name: Check the published manifest, and that every URL it names resolves
         run: |
           url=https://github.com/${{ github.repository }}/releases/latest/download/latest.json
           for attempt in 1 2 3 4 5; do
@@ -282,13 +283,29 @@ jobs:
             echo "Attempt $attempt: HTTP $code, waiting for the asset to serve."
             sleep 10
           done
-          node -e '
-            const manifest = require("./published.json");
-            const want = ["darwin-aarch64", "darwin-x86_64", "linux-x86_64", "windows-x86_64"];
-            const missing = want.filter((key) => !manifest.platforms?.[key]?.url);
-            if (manifest.version !== "${{ steps.compose.outputs.version }}") {
-              throw new Error(`releases/latest serves ${manifest.version}, expected ${{ steps.compose.outputs.version }}`);
-            }
-            if (missing.length) throw new Error(`Published manifest is missing: ${missing.join(", ")}`);
-            console.log(`releases/latest serves ${manifest.version} for ${want.join(", ")}`);
-          '
+
+          version=$(node -p "require('./published.json').version")
+          if [ "$version" != "${{ steps.compose.outputs.version }}" ]; then
+            echo "::error::releases/latest serves $version, expected ${{ steps.compose.outputs.version }}"
+            exit 1
+          fi
+
+          failed=0
+          for platform in darwin-aarch64 darwin-x86_64 linux-x86_64 windows-x86_64; do
+            asset=$(node -p "require('./published.json').platforms['$platform']?.url ?? ''")
+            if [ -z "$asset" ]; then
+              echo "::error::Published manifest has no entry for $platform"
+              failed=1
+              continue
+            fi
+            # A ranged request proves the asset is served without pulling 80 MB.
+            code=$(curl -sSL -o /dev/null -r 0-1023 -w '%{http_code}' "$asset" || true)
+            if [ "$code" != "200" ] && [ "$code" != "206" ]; then
+              echo "::error::$platform points at $asset which answered HTTP $code"
+              failed=1
+            else
+              echo "$platform -> HTTP $code  $asset"
+            fi
+          done
+          [ "$failed" = "0" ] || exit 1
+          echo "releases/latest serves $version, and all four downloads resolve."

@@ -74,6 +74,26 @@ async function fetchSignature(asset: ApiAsset): Promise<string> {
   return await response.text();
 }
 
+/**
+ * The public download URL for each asset, built from the tag.
+ *
+ * Deliberately **not** `browser_download_url`. A draft release has no tag yet,
+ * so GitHub answers with an `untagged-<hash>` path — and the composer now runs
+ * against a draft on purpose. Those placeholder URLs stop working the moment
+ * the release is published under its real tag, which is exactly when the
+ * manifest starts being read: v0.4.1 shipped a manifest where all four URLs
+ * 404ed, and nothing noticed because every platform key was present.
+ *
+ * The tag form is what the URL becomes once published, so it is correct for a
+ * draft and a published release alike.
+ */
+export function toReleaseAssets(repo: string, tag: string, assets: ApiAsset[]): ReleaseAsset[] {
+  return assets.map((asset) => ({
+    name: asset.name,
+    url: `https://github.com/${repo}/releases/download/${tag}/${asset.name}`,
+  }));
+}
+
 async function main(): Promise<void> {
   const [repo, version, outFile] = process.argv.slice(2);
   if (!repo || !version || !outFile) {
@@ -82,10 +102,7 @@ async function main(): Promise<void> {
 
   const tag = `v${version}`;
   const release = await fetchRelease(repo, tag);
-  const assets: ReleaseAsset[] = release.assets.map((asset) => ({
-    name: asset.name,
-    url: asset.browser_download_url,
-  }));
+  const assets: ReleaseAsset[] = toReleaseAssets(repo, tag, release.assets);
 
   const applicable = assets.filter((asset) => !asset.name.endsWith('.sig') && platformFor(asset.name));
   console.log(`Release ${tag} carries ${assets.length} assets; the updater can apply:`);

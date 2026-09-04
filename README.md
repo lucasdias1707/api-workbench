@@ -69,8 +69,8 @@ clicar em **Check now**.
 
 Dois detalhes:
 
-- **A `v0.2.0` é instalação manual**, por ser a primeira a trazer o updater. Dela em diante
-  o automático funciona.
+- **A `v0.2.0` foi a última instalação obrigatoriamente manual**, por ser a primeira a
+  trazer o updater. Quem está nela em diante recebe as próximas sozinho.
 - **`.deb` e `.rpm` não se atualizam sozinhos.** Esses arquivos pertencem ao gerenciador de
   pacotes da distro, e o app sobrescrevê-los deixaria o sistema com um registro errado do que
   está instalado. Nesse caso o Carom detecta a situação, avisa que há versão nova e manda

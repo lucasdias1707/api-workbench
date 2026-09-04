@@ -1,5 +1,5 @@
 import { Download, RefreshCw, RotateCw } from 'lucide-react';
-import { useUpdateCheck } from '@/hooks/use-update-check';
+import { useUpdates } from '@/state/update-store';
 import { canSelfUpdate, describeDownload, releasePageUrl, restartApp } from '@/lib/updates';
 import { useWorkspace } from '@/state/workspace-store';
 
@@ -13,7 +13,9 @@ import { useWorkspace } from '@/state/workspace-store';
 export function UpdatesSection() {
   const { state, dispatch } = useWorkspace();
   const settings = state.settings;
-  const updates = useUpdateCheck(settings.autoCheckUpdates);
+  // The check itself runs app-wide, so opening this dialog shows whatever was
+  // already found rather than starting again.
+  const updates = useUpdates();
 
   const selfUpdating = updates.installKind ? canSelfUpdate(updates.installKind) : true;
 

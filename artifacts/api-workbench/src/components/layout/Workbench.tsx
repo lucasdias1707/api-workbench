@@ -20,6 +20,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { ShortcutsDialog } from '@/components/dialogs/ShortcutsDialog';
 import { EnvironmentPicker } from '@/components/layout/EnvironmentPicker';
 import { FolderPane } from '@/components/layout/FolderPane';
+import { UpdateBadge } from '@/components/layout/UpdateBadge';
 import { TabStrip } from '@/components/layout/TabStrip';
 import { RequestPane } from '@/components/request/RequestPane';
 import { ResponsePane } from '@/components/response/ResponsePane';
@@ -160,6 +161,7 @@ export function Workbench() {
             >
               {state.settings.layout === 'horizontal' ? <Rows2 size={15} /> : <Columns2 size={15} />}
             </button>
+            <UpdateBadge onOpenSettings={() => setOverlay('settings')} />
             <button
               className="icon-btn"
               onClick={() => setOverlay('settings')}

@@ -227,6 +227,57 @@ describe('importing a tree', () => {
     expect(next.activeFolderId).toBe(folder.id);
   });
 
+  it('creates the destination workspace and moves into it', () => {
+    const state = seed();
+    const workspace = createWorkspace('Imported');
+    const folder = createFolder(workspace.id, 'Acme API', null, 0);
+    const next = reducer(state, {
+      type: 'import/merge',
+      folders: [folder],
+      requests: [],
+      environment: null,
+      workspace,
+      baseEnvironment: createEnvironment(workspace.id, 'Base', true, []),
+      workspaceId: workspace.id,
+    });
+
+    expect(next.workspaces.map((item) => item.name)).toContain('Imported');
+    expect(next.activeWorkspaceId).toBe(workspace.id);
+    expect(next.environments.filter((item) => item.workspaceId === workspace.id)).toHaveLength(1);
+    expect(next.activeFolderId).toBe(folder.id);
+  });
+
+  it("leaves the old workspace's tabs behind when the import lands elsewhere", () => {
+    // A tab belongs to the workspace it was opened from; carrying it across
+    // would show a request that is not in the tree any more.
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const workspace = createWorkspace('Imported');
+    const next = reducer(opened, {
+      type: 'import/merge',
+      folders: [createFolder(workspace.id, 'Acme API', null, 0)],
+      requests: [],
+      environment: null,
+      workspace,
+      baseEnvironment: createEnvironment(workspace.id, 'Base', true, []),
+      workspaceId: workspace.id,
+    });
+    expect(next.openTabIds).toEqual([]);
+    expect(next.activeRequestId).toBeNull();
+  });
+
+  it('stays put when the destination is the workspace already open', () => {
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const next = reducer(opened, {
+      type: 'import/merge',
+      folders: [],
+      requests: [],
+      environment: null,
+      workspaceId: opened.activeWorkspaceId,
+    });
+    expect(next.openTabIds).toEqual(opened.openTabIds);
+    expect(next.activeWorkspaceId).toBe(opened.activeWorkspaceId);
+  });
+
   it('changes nothing about the view when only an environment came in', () => {
     const state = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
     const environment = createEnvironment(state.activeWorkspaceId, 'Staging', false, []);

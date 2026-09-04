@@ -60,9 +60,16 @@ versões recentes do macOS para este caso — use um dos dois caminhos acima.
 ## Atualização
 
 A partir da `v0.2.0` o Carom se atualiza sozinho. Ao abrir, ele consulta as releases deste
-repositório; se houver versão nova, aparece um aviso em **Settings → Updates** com as notas
-da versão e um botão **Download and install**. O download só acontece se você clicar —
-nunca sozinho. Terminando, é um clique em **Restart now** e pronto.
+repositório. Se houver versão nova, duas coisas acontecem:
+
+- um **aviso na tela** dizendo qual versão saiu;
+- um **botão de download azul** aparece na barra de cima, ao lado da engrenagem — passando o
+  mouse nele, o texto diz qual versão está disponível. Ele só existe quando há o que baixar,
+  fica cinza enquanto baixa e verde (com ícone de reiniciar) quando termina.
+
+Clicar nesse botão abre **Settings → Updates**, com as notas da versão e **Download and
+install**. O download só acontece se você clicar — nunca sozinho. Terminando, é um clique em
+**Restart now** e pronto.
 
 A checagem automática pode ser desligada no mesmo lugar; aí o update só acontece quando você
 clicar em **Check now**.
@@ -124,6 +131,14 @@ opções são:
 
 `Import Postman`, na barra lateral, lê uma **coleção (v2.1)** ou um **environment** exportados
 do Postman — por arquivo ou colando o JSON.
+
+Antes de importar você vê a árvore inteira e marca o que quer: marcar uma pasta leva tudo
+abaixo dela, e dá para desmarcar uma request específica dentro de uma pasta marcada. Uma pasta
+que você deixou desmarcada ainda vem junto se algo dentro dela foi marcado — sem ela a request
+não teria onde ficar.
+
+Também dá para escolher **para qual workspace** vai, inclusive um **criado ali na hora**. Útil
+para não misturar uma coleção de terceiros com o seu trabalho.
 
 A coleção vira uma pasta, e é ela que guarda as variáveis, a auth e os scripts que estavam no
 nível da coleção. Assim tudo dentro continua herdando como herdava lá: uma request sem bloco

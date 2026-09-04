@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { importPostman, parsePostman, toAuth, toBody, toUrl } from '@/lib/postman';
+import {
+  allIds,
+  importPostman,
+  importTree,
+  parsePostman,
+  pruneImport,
+  retargetImport,
+  subtreeIds,
+  toAuth,
+  toBody,
+  toUrl,
+} from '@/lib/postman';
 
 const collection = (overrides: Record<string, unknown> = {}) => ({
   info: { name: 'My API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
@@ -225,6 +236,114 @@ describe('importPostman', () => {
     expect(result.folders).toEqual([]);
     expect(result.environment).toMatchObject({ name: 'Staging', isBase: false });
     expect(result.environment!.variables.map((item) => item.enabled)).toEqual([true, false]);
+  });
+});
+
+describe('choosing what to import', () => {
+  const nested = () =>
+    importOf(
+      collection({
+        item: [
+          {
+            name: 'Users',
+            item: [
+              { name: 'List users', request: { method: 'GET', url: '/users' } },
+              { name: 'Create user', request: { method: 'POST', url: '/users' } },
+              { name: 'Admin', item: [{ name: 'Ban user', request: { method: 'POST', url: '/ban' } }] },
+            ],
+          },
+          { name: 'Ping', request: { method: 'GET', url: '/ping' } },
+        ],
+      }),
+    );
+
+  it('builds the tree the dialog draws, nested as the collection was', () => {
+    const tree = importTree(nested());
+    expect(tree).toHaveLength(1);
+    expect(tree[0]).toMatchObject({ kind: 'folder', name: 'My API', depth: 0 });
+
+    const users = tree[0].kind === 'folder' ? tree[0].children[0] : null;
+    expect(users).toMatchObject({ kind: 'folder', name: 'Users', depth: 1 });
+    if (users?.kind !== 'folder') throw new Error('expected a folder');
+    expect(users.children.map((node) => node.name)).toEqual(['Admin', 'List users', 'Create user']);
+  });
+
+  it('carries the method through, so a row reads like the sidebar', () => {
+    const tree = importTree(nested());
+    const ping = tree[0].kind === 'folder' ? tree[0].children.at(-1) : null;
+    expect(ping).toMatchObject({ kind: 'request', name: 'Ping', method: 'GET' });
+  });
+
+  it('lists every id once, which is what "select all" ticks', () => {
+    const imported = nested();
+    const ids = allIds(importTree(imported));
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toHaveLength(imported.folders.length + imported.requests.length);
+  });
+
+  it('ticking a folder means everything under it', () => {
+    const tree = importTree(nested());
+    const users = tree[0].kind === 'folder' ? tree[0].children[0] : null;
+    if (users?.kind !== 'folder') throw new Error('expected a folder');
+    // Users, its three children, Admin's own request.
+    expect(subtreeIds(users)).toHaveLength(5);
+  });
+
+  it('keeps only what was ticked', () => {
+    const imported = nested();
+    const ping = imported.requests.find((request) => request.name === 'Ping')!;
+    const pruned = pruneImport(imported, new Set([ping.id]));
+    expect(pruned.requests.map((request) => request.name)).toEqual(['Ping']);
+  });
+
+  it('brings an unticked folder along when something inside it was ticked', () => {
+    // Otherwise the request would have nowhere to sit, or would silently move.
+    const imported = nested();
+    const ban = imported.requests.find((request) => request.name === 'Ban user')!;
+    const pruned = pruneImport(imported, new Set([ban.id]));
+    expect(pruned.folders.map((folder) => folder.name)).toEqual(['My API', 'Users', 'Admin']);
+    expect(pruned.requests).toHaveLength(1);
+  });
+
+  it('does not infer the other way: an unticked request inside a ticked folder stays out', () => {
+    const imported = nested();
+    const users = imported.folders.find((folder) => folder.name === 'Users')!;
+    const list = imported.requests.find((request) => request.name === 'List users')!;
+    const pruned = pruneImport(imported, new Set([users.id, list.id]));
+    expect(pruned.requests.map((request) => request.name)).toEqual(['List users']);
+  });
+
+  it('keeps an empty folder that was ticked on its own', () => {
+    const imported = nested();
+    const admin = imported.folders.find((folder) => folder.name === 'Admin')!;
+    const pruned = pruneImport(imported, new Set([admin.id]));
+    expect(pruned.folders.map((folder) => folder.name)).toEqual(['My API', 'Users', 'Admin']);
+    expect(pruned.requests).toEqual([]);
+  });
+
+  it('takes nothing when nothing is ticked', () => {
+    expect(pruneImport(nested(), new Set())).toEqual({ folders: [], requests: [] });
+  });
+});
+
+describe('retargetImport', () => {
+  it('points every record at another workspace', () => {
+    const imported = importOf(collection({ item: [{ name: 'Ping', request: '/ping' }] }));
+    const moved = retargetImport(imported, 'other');
+    expect(moved.folders.every((folder) => folder.workspaceId === 'other')).toBe(true);
+    expect(moved.requests.every((request) => request.workspaceId === 'other')).toBe(true);
+  });
+
+  it('leaves the ids alone, so a selection survives changing the destination', () => {
+    const imported = importOf(collection({ item: [{ name: 'Ping', request: '/ping' }] }));
+    const moved = retargetImport(imported, 'other');
+    expect(moved.requests[0].id).toBe(imported.requests[0].id);
+    expect(moved.folders[0].id).toBe(imported.folders[0].id);
+  });
+
+  it('moves an imported environment too', () => {
+    const imported = importOf({ name: 'Staging', values: [], _postman_variable_scope: 'environment' });
+    expect(retargetImport(imported, 'other').environment!.workspaceId).toBe('other');
   });
 });
 

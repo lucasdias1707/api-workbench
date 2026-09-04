@@ -96,3 +96,44 @@ export async function restartApp(): Promise<void> {
   const { relaunch } = await import('@tauri-apps/plugin-process');
   await relaunch();
 }
+
+/** What the top-bar badge should look like, or `null` for "show nothing". */
+export type UpdateBadgeView = {
+  /** Drives the colour: blue for waiting, green for installed, grey while busy. */
+  tone: 'available' | 'busy' | 'ready';
+  /** The hover text. It has to say what clicking does, since the icon alone cannot. */
+  label: string;
+};
+
+/**
+ * Turn the update state into the badge.
+ *
+ * Pure and separate from the component because this is the part that decides
+ * whether anyone ever learns a new version exists, and it is worth being able
+ * to test each phase without a desktop shell to run it in.
+ *
+ * `idle`, `checking`, `current` and `error` all show nothing: a bar that
+ * carries a permanently dead icon teaches people to ignore it, and a failed
+ * check is reported in Settings, where it can be acted on.
+ */
+export function describeUpdateBadge(
+  phase: string,
+  update: { version: string } | null,
+  progress: { received: number; total: number },
+): UpdateBadgeView | null {
+  if (phase === 'ready') {
+    return {
+      tone: 'ready',
+      label: update
+        ? `Version ${update.version} is installed — restart to finish`
+        : 'An update is installed — restart to finish',
+    };
+  }
+  if (phase === 'downloading') {
+    return { tone: 'busy', label: `Downloading — ${describeDownload(progress.received, progress.total)}` };
+  }
+  if (phase === 'available' && update) {
+    return { tone: 'available', label: `Version ${update.version} is available — click to download it` };
+  }
+  return null;
+}

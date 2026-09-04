@@ -340,3 +340,100 @@ export function parsePostman(raw: string, workspaceId: string, startIndex = 0): 
   }
   return importPostman(payload, workspaceId, startIndex);
 }
+
+/**
+ * A node in the tree the import dialog shows, so someone can see what is in a
+ * collection before agreeing to take all of it.
+ */
+export type ImportNode =
+  | { kind: 'folder'; id: string; name: string; depth: number; children: ImportNode[] }
+  | { kind: 'request'; id: string; name: string; method: HttpMethod; depth: number };
+
+/** Build that tree out of an already-parsed import. */
+export function importTree(imported: PostmanImport): ImportNode[] {
+  const build = (parentId: string | null, depth: number): ImportNode[] => [
+    ...imported.folders
+      .filter((folder) => folder.parentId === parentId)
+      .map<ImportNode>((folder) => ({
+        kind: 'folder',
+        id: folder.id,
+        name: folder.name,
+        depth,
+        children: build(folder.id, depth + 1),
+      })),
+    ...imported.requests
+      .filter((request) => request.folderId === parentId)
+      .map<ImportNode>((request) => ({
+        kind: 'request',
+        id: request.id,
+        name: request.name,
+        method: request.method,
+        depth,
+      })),
+  ];
+  return build(null, 0);
+}
+
+/** Every id at or below a node — what ticking a folder ticks. */
+export function subtreeIds(node: ImportNode): string[] {
+  if (node.kind === 'request') return [node.id];
+  return [node.id, ...node.children.flatMap(subtreeIds)];
+}
+
+/** Every id in the tree, for "select all". */
+export function allIds(nodes: ImportNode[]): string[] {
+  return nodes.flatMap(subtreeIds);
+}
+
+/**
+ * Keep only what was ticked.
+ *
+ * A folder that was not ticked itself still comes along when something under it
+ * was: it is the path to that request, and dropping it would either orphan the
+ * request or silently move it somewhere it never was. Nothing else is inferred
+ * — unticking one request inside a ticked folder leaves the rest alone, which
+ * is the whole point of a per-row checkbox.
+ */
+export function pruneImport(
+  imported: PostmanImport,
+  selected: ReadonlySet<string>,
+): { folders: Folder[]; requests: RequestRecord[] } {
+  const requests = imported.requests.filter((request) => selected.has(request.id));
+  const byId = new Map(imported.folders.map((folder) => [folder.id, folder]));
+
+  const keep = new Set<string>();
+  const keepWithAncestors = (folderId: string | null) => {
+    let current = folderId;
+    const seen = new Set<string>();
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      keep.add(current);
+      current = byId.get(current)?.parentId ?? null;
+    }
+  };
+
+  for (const folder of imported.folders) {
+    if (selected.has(folder.id)) keepWithAncestors(folder.id);
+  }
+  for (const request of requests) keepWithAncestors(request.folderId);
+
+  return {
+    folders: imported.folders.filter((folder) => keep.has(folder.id)),
+    requests,
+  };
+}
+
+/**
+ * Point everything at another workspace.
+ *
+ * Ids are left alone on purpose: the dialog's tick boxes are keyed on them, and
+ * changing the destination must not throw the selection away.
+ */
+export function retargetImport(imported: PostmanImport, workspaceId: string): PostmanImport {
+  return {
+    ...imported,
+    folders: imported.folders.map((folder) => ({ ...folder, workspaceId })),
+    requests: imported.requests.map((request) => ({ ...request, workspaceId })),
+    environment: imported.environment ? { ...imported.environment, workspaceId } : null,
+  };
+}

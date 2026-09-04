@@ -28,5 +28,19 @@ export type Action =
   | { type: 'response/add'; response: ResponseRecord }
   | { type: 'response/clear'; requestId: string }
   | { type: 'settings/update'; patch: Partial<Settings> }
-  /** Append a whole imported tree at once, so one undoable step covers it. */
-  | { type: 'import/merge'; folders: Folder[]; requests: RequestRecord[]; environment: Environment | null };
+  /**
+   * Append a whole imported tree at once, so one undoable step covers it.
+   * `workspace` is set when the import created its destination, in which case
+   * the app moves to it — importing somewhere you cannot see is not an import.
+   */
+  | {
+      type: 'import/merge';
+      folders: Folder[];
+      requests: RequestRecord[];
+      environment: Environment | null;
+      workspace?: Workspace | null;
+      /** Base environment for a workspace created by this import. */
+      baseEnvironment?: Environment | null;
+      /** Which workspace to land in; defaults to the active one. */
+      workspaceId?: string;
+    };

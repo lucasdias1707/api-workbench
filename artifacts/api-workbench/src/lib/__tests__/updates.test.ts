@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { canSelfUpdate, describeDownload, releasePageUrl, type InstallKind } from '@/lib/updates';
+import {
+  canSelfUpdate,
+  describeDownload,
+  describeUpdateBadge,
+  releasePageUrl,
+  type InstallKind,
+} from '@/lib/updates';
 
 describe('canSelfUpdate', () => {
   it('allows the formats that can replace their own files', () => {
@@ -49,5 +55,51 @@ describe('describeDownload', () => {
 
   it('starts at zero rather than empty', () => {
     expect(describeDownload(0, 1024)).toBe('0 B of 1.0 KB · 0%');
+  });
+});
+
+describe('describeUpdateBadge', () => {
+  const nothing = { received: 0, total: 0 };
+  const version = { version: '0.4.0' };
+
+  it('shows nothing while there is nothing to act on', () => {
+    // A bar carrying a permanently dead icon teaches people to ignore it.
+    for (const phase of ['idle', 'checking', 'current']) {
+      expect(describeUpdateBadge(phase, null, nothing)).toBeNull();
+    }
+  });
+
+  it('shows nothing when a check failed', () => {
+    // The failure is reported in Settings, where it can be acted on; a badge
+    // would promise a download that does not exist.
+    expect(describeUpdateBadge('error', null, nothing)).toBeNull();
+  });
+
+  it('announces a version that is waiting, and says what clicking does', () => {
+    expect(describeUpdateBadge('available', version, nothing)).toEqual({
+      tone: 'available',
+      label: 'Version 0.4.0 is available — click to download it',
+    });
+  });
+
+  it('shows nothing for "available" with no version, which should not happen', () => {
+    expect(describeUpdateBadge('available', null, nothing)).toBeNull();
+  });
+
+  it('reports progress while downloading', () => {
+    const badge = describeUpdateBadge('downloading', version, { received: 512, total: 1024 });
+    expect(badge?.tone).toBe('busy');
+    expect(badge?.label).toContain('50%');
+  });
+
+  it('asks for a restart once the update is in place', () => {
+    expect(describeUpdateBadge('ready', version, nothing)).toEqual({
+      tone: 'ready',
+      label: 'Version 0.4.0 is installed — restart to finish',
+    });
+  });
+
+  it('still asks for a restart if the version was somehow lost', () => {
+    expect(describeUpdateBadge('ready', null, nothing)?.tone).toBe('ready');
   });
 });

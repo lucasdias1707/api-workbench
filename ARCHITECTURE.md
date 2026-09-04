@@ -65,6 +65,8 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/postman.ts` — leitura de uma coleção (v2.1) ou de um environment exportados do Postman
 - `lib/updates.ts` — checagem, download e restart; único lugar que conhece o plugin do updater
 - `hooks/use-update-check.ts` — estados da checagem; checa no mount, nunca baixa sozinho
+- `state/update-store.tsx` — uma checagem para o app inteiro, e o toast de versão nova
+- `components/layout/UpdateBadge.tsx` — o botão de download na topbar (`describeUpdateBadge` decide o que ele diz)
 - `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição
 - `lib/json-lexer.ts` — tokeniza JSON incompleto para colorir enquanto se digita
 - `lib/editor-keys.ts` — Tab, auto-fechamento de `{ [ "` e envolver seleção, como funções puras
@@ -126,6 +128,18 @@ barra de menu do macOS e a bandeja do Windows pedem.
   que o app alcança — no desktop, isso inclui a rede e a máquina. É inerente à funcionalidade
   (um script que não age não serve para nada), e por isso o aviso fica visível na própria aba
   de Scripts e no diálogo de importação, não escondido num tooltip.
+- **A checagem de update é do app, não do diálogo.** Ela morava dentro de Settings, então só
+  rodava enquanto aquele diálogo estivesse aberto — quem nunca abria Settings nunca ficava
+  sabendo de versão nova. Subiu para um provider: um único estado alimenta o toast da
+  abertura, o botão da topbar e a seção de Settings, e o progresso de um download não fica
+  dividido entre duas cópias do hook.
+- **O botão de update só existe quando há o que fazer.** Nada de ícone permanentemente morto
+  na barra: é ele o único controle colorido lá em cima, então a cor sozinha já chama atenção.
+  Um erro de checagem não vira badge — ele aparece em Settings, onde dá para agir.
+- **Importar não é tudo ou nada.** A árvore da coleção vem com checkbox por linha. Marcar uma
+  pasta leva tudo abaixo dela; desmarcar uma request dentro de uma pasta marcada deixa o
+  resto — é para isso que serve um checkbox por linha. Uma pasta desmarcada ainda vem junto
+  quando algo dentro dela foi marcado: ela é o caminho até aquela request.
 - **Respostas com orçamento.** Corpos são truncados em 128 KB e o gravador vai descartando
   respostas quando o localStorage estoura a cota, para nunca perder as requisições do usuário.
 
@@ -139,7 +153,9 @@ barra de menu do macOS e a bandeja do Windows pedem.
 - Auth: herdar da pasta (padrão), nenhuma, Bearer, Basic, API key (header ou query)
 - Clicar numa pasta abre o painel dela: variáveis, auth herdada por tudo abaixo, e scripts
 - Scripts pré-requisição e pós-resposta em request e em pasta, com aba Console na resposta
-- Importar uma coleção (v2.1) ou um environment do Postman
+- Importar uma coleção (v2.1) ou um environment do Postman, escolhendo o que vem e para
+  qual workspace — inclusive um criado na hora da importação
+- Aviso de versão nova: toast na abertura e um botão de download colorido na topbar
 - Linhas de chave/valor com liga/desliga individual
 - Resposta: status colorido, tempo, tamanho, tipo; abas Pretty (árvore JSON dobrável com busca),
   Raw, Preview (HTML em iframe isolado), Headers, Cookies e History por requisição

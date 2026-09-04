@@ -1,7 +1,7 @@
 import { cloneRequest } from '@/lib/factories';
 import { createId } from '@/lib/id';
 import type { Action } from '@/state/actions';
-import type { RequestRecord, WorkspaceState } from '@/types';
+import type { Environment, RequestRecord, WorkspaceState } from '@/types';
 import { isDescendantFolder } from '@/state/selectors';
 
 /** Keep at most this many responses per request so history stays useful but bounded. */
@@ -267,14 +267,26 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       return { ...state, responses: state.responses.filter((response) => response.requestId !== action.requestId) };
 
     case 'import/merge': {
+      const added = [action.baseEnvironment, action.environment].filter(
+        (environment): environment is Environment => Boolean(environment),
+      );
+      const destination = action.workspaceId ?? action.workspace?.id ?? state.activeWorkspaceId;
+      const moving = destination !== state.activeWorkspaceId;
+
       const next: WorkspaceState = {
         ...state,
+        workspaces: action.workspace ? [...state.workspaces, action.workspace] : state.workspaces,
         folders: [...state.folders, ...action.folders],
         requests: [...state.requests, ...action.requests],
-        environments: action.environment ? [...state.environments, action.environment] : state.environments,
+        environments: [...state.environments, ...added],
+        activeWorkspaceId: destination,
+        // Tabs belong to the workspace they were opened from, so importing
+        // somewhere else leaves them behind rather than dragging them along.
+        ...(moving ? { openTabIds: [], activeRequestId: null, activeEnvironmentId: null } : {}),
       };
+
       // Land on what was just imported rather than leaving it to be hunted for
-      // in the tree: the outermost new folder, or the new environment's owner.
+      // in the tree: the outermost new folder.
       const landing = action.folders[0];
       return landing ? { ...next, activeFolderId: landing.id, activeRequestId: null } : next;
     }

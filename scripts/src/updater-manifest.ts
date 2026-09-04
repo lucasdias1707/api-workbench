@@ -7,6 +7,13 @@
  * platform survives — the updater would then work on one platform and quietly
  * fail on the other three. Composing it once, after every job has finished, is
  * the only way the file describes all four.
+ *
+ * It works from the release's own asset list rather than from the build
+ * directory. The build directory is not the same set: the bundler also writes
+ * a `.AppImage.tar.gz` that `tauri-action` does not upload, plus lowercase
+ * copies of every bundle that collide case-insensitively inside a workflow
+ * artifact zip. Naming any of those in the manifest produces a URL that 404s
+ * for the platform it belongs to, on a file that otherwise looks complete.
  */
 
 /** Keys the updater looks itself up by. Fixed by the plugin, not by us. */
@@ -19,13 +26,8 @@ export const REQUIRED_PLATFORMS: PlatformKey[] = [
   'windows-x86_64',
 ];
 
-/** A bundle produced by one matrix job, paired with its detached signature. */
-export type SignedBundle = {
-  /** File name as it appears on the release, e.g. `Carom_aarch64.app.tar.gz`. */
-  assetName: string;
-  /** Contents of the matching `.sig` file. */
-  signature: string;
-};
+/** One file attached to the GitHub release. */
+export type ReleaseAsset = { name: string; url: string };
 
 export type UpdaterManifest = {
   version: string;
@@ -35,21 +37,22 @@ export type UpdaterManifest = {
 };
 
 /**
- * Suffixes the updater can actually apply, and which platform each serves.
+ * Suffixes the updater can apply, and which platform each serves.
  *
- * Order is preference: Tauri signs several formats per platform, and Windows in
- * particular can produce both an NSIS installer and an MSI. The NSIS one wins
- * because it is what `installMode: passive` in tauri.conf.json configures.
+ * Order is preference. The bare `.AppImage` comes before the archived form
+ * because that is the one that reaches the release. Windows can produce both
+ * an NSIS installer and an MSI; NSIS wins, since `installMode: passive` in
+ * tauri.conf.json configures that one.
  *
  * Deliberately absent: `.dmg` (how a person installs by hand — the updater
- * swaps the `.app` inside the tarball instead), and `.deb`/`.rpm`, which Tauri
- * also signs but which belong to the package manager. Matching those would
- * hand someone a file their platform cannot apply.
+ * swaps the `.app` out of the tarball instead), and `.deb`/`.rpm`, which Tauri
+ * also signs but which belong to the package manager. Naming those would hand
+ * someone a file their platform cannot apply.
  */
 const APPLIES: Array<{ suffix: string; key: PlatformKey | 'darwin-by-arch' }> = [
   { suffix: '.app.tar.gz', key: 'darwin-by-arch' },
-  { suffix: '.AppImage.tar.gz', key: 'linux-x86_64' },
   { suffix: '.AppImage', key: 'linux-x86_64' },
+  { suffix: '.AppImage.tar.gz', key: 'linux-x86_64' },
   { suffix: '-setup.exe', key: 'windows-x86_64' },
   { suffix: '-setup.exe.zip', key: 'windows-x86_64' },
   { suffix: '.nsis.zip', key: 'windows-x86_64' },
@@ -74,16 +77,13 @@ function preference(assetName: string): number {
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-export function downloadUrl(repoUrl: string, tag: string, assetName: string): string {
-  return `${repoUrl.replace(/\/$/, '')}/releases/download/${tag}/${encodeURIComponent(assetName)}`;
-}
-
 export type ManifestInput = {
   version: string;
-  tag: string;
-  repoUrl: string;
   notes: string;
-  bundles: SignedBundle[];
+  /** Everything attached to the release, including the `.sig` files. */
+  assets: ReleaseAsset[];
+  /** The detached signature for an asset, by that asset's exact name. */
+  signatureFor: (assetName: string) => string | undefined;
   /** Injected so the output is reproducible in tests. */
   now?: Date;
 };
@@ -96,31 +96,40 @@ export type ManifestInput = {
  * no update at all, and it would ship without anyone noticing.
  */
 export function buildManifest(input: ManifestInput): UpdaterManifest {
-  const chosen = new Map<PlatformKey, SignedBundle>();
+  const chosen = new Map<PlatformKey, ReleaseAsset>();
 
-  for (const bundle of input.bundles) {
-    const key = platformFor(bundle.assetName);
+  for (const asset of input.assets) {
+    if (asset.name.endsWith('.sig')) continue;
+    const key = platformFor(asset.name);
     if (!key) continue;
     const held = chosen.get(key);
-    if (!held || preference(bundle.assetName) < preference(held.assetName)) {
-      chosen.set(key, bundle);
-    }
+    if (!held || preference(asset.name) < preference(held.name)) chosen.set(key, asset);
   }
 
   const missing = REQUIRED_PLATFORMS.filter((key) => !chosen.has(key));
   if (missing.length > 0) {
     throw new Error(
-      `No signed bundle for ${missing.join(', ')}. Every platform must be present, or its users silently stop receiving updates.`,
+      `The release has no bundle for ${missing.join(', ')}. Every platform must be present, or its users silently stop receiving updates.`,
     );
   }
 
   const platforms: UpdaterManifest['platforms'] = {};
+  const unsigned: string[] = [];
+
   for (const key of REQUIRED_PLATFORMS) {
-    const bundle = chosen.get(key) as SignedBundle;
-    platforms[key] = {
-      signature: bundle.signature.trim(),
-      url: downloadUrl(input.repoUrl, input.tag, bundle.assetName),
-    };
+    const asset = chosen.get(key) as ReleaseAsset;
+    const signature = input.signatureFor(asset.name);
+    if (!signature) {
+      unsigned.push(asset.name);
+      continue;
+    }
+    platforms[key] = { signature: signature.trim(), url: asset.url };
+  }
+
+  if (unsigned.length > 0) {
+    throw new Error(
+      `No signature published for ${unsigned.join(', ')}. The updater rejects anything it cannot verify, so an unsigned entry is a dead one.`,
+    );
   }
 
   return {

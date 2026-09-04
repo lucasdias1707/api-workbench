@@ -85,6 +85,10 @@ jobs:
       # reads "set but empty" as "sign with this key" and fails to decode it.
       # Every build broke that way before this step existed.
       - name: Set up updater signing
+        # Windows runners default to PowerShell, which parses this as PowerShell
+        # and fails on the first `if [`. It is the only step here that runs on
+        # every platform, so it is the only one that has to say so.
+        shell: bash
         env:
           SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

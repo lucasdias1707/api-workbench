@@ -50,9 +50,9 @@ export function UpdatesSection() {
       <div style={{ marginTop: 10 }} data-testid="text-update-status">
         {updates.phase === 'current' ? <p className="hint">You are on the latest version.</p> : null}
 
-        {updates.phase === 'error' ? (
+        {updates.error ? (
           <p className="hint" style={{ color: 'var(--red)' }}>
-            {updates.error}
+            {updates.error.message}
           </p>
         ) : null}
 

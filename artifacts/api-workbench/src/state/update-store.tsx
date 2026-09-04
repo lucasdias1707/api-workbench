@@ -20,6 +20,8 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
   const updates = useUpdateCheck(state.settings.autoCheckUpdates);
   /** Versions already announced, so a re-check does not re-announce. */
   const announced = useRef(new Set<string>());
+  /** Same, for the "installed" notice, which is a different moment. */
+  const installed = useRef(new Set<string>());
 
   useEffect(() => {
     const version = updates.update?.version;
@@ -27,8 +29,24 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     announced.current.add(version);
     toast({
       title: `Carom ${version} is available`,
-      description: 'Use the download button in the top bar, or open Settings.',
+      description: 'Click the download button in the top bar to install it.',
       kind: 'info',
+    });
+  }, [updates.phase, updates.update?.version, toast]);
+
+  /**
+   * A download takes minutes, and whoever started it has almost certainly
+   * looked away by the time it lands. The badge turns green, which is no use
+   * to someone not watching the bar — so say it once, out loud.
+   */
+  useEffect(() => {
+    const version = updates.update?.version;
+    if (updates.phase !== 'ready' || !version || installed.current.has(version)) return;
+    installed.current.add(version);
+    toast({
+      title: `Carom ${version} is ready`,
+      description: 'Restart to finish — the button in the top bar does it.',
+      kind: 'success',
     });
   }, [updates.phase, updates.update?.version, toast]);
 

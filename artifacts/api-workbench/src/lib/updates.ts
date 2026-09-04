@@ -99,10 +99,27 @@ export async function restartApp(): Promise<void> {
 
 /** What the top-bar badge should look like, or `null` for "show nothing". */
 export type UpdateBadgeView = {
-  /** Drives the colour: blue for waiting, green for installed, grey while busy. */
-  tone: 'available' | 'busy' | 'ready';
-  /** The hover text. It has to say what clicking does, since the icon alone cannot. */
+  /** Drives the colour: blue waiting, grey busy, green installed, red failed. */
+  tone: 'available' | 'busy' | 'ready' | 'failed';
+  /** The hover text. It has to say what clicking does, since the icon cannot. */
   label: string;
+  /**
+   * What the click does. The badge acts on the update itself rather than
+   * sending anyone to Settings for a second click — Settings is still there,
+   * behind the gear, for the notes and the preference.
+   */
+  action: 'download' | 'restart' | 'release-page' | 'none';
+};
+
+export type UpdateBadgeInput = {
+  /**
+   * False for a `.deb` or `.rpm`, where the files belong to the package
+   * manager. Clicking has to lead somewhere useful rather than start a
+   * download that the installer would refuse.
+   */
+  selfUpdating?: boolean;
+  /** Set when a *download* failed, so the button that started it can say so. */
+  downloadError?: string;
 };
 
 /**
@@ -112,28 +129,62 @@ export type UpdateBadgeView = {
  * whether anyone ever learns a new version exists, and it is worth being able
  * to test each phase without a desktop shell to run it in.
  *
- * `idle`, `checking`, `current` and `error` all show nothing: a bar that
- * carries a permanently dead icon teaches people to ignore it, and a failed
- * check is reported in Settings, where it can be acted on.
+ * `idle`, `checking` and `current` show nothing: a bar that carries a
+ * permanently dead icon teaches people to ignore it. A failed *check* shows
+ * nothing either — it is reported in Settings, where it can be acted on, and a
+ * badge there would promise a download that does not exist. A failed
+ * *download* is the opposite: someone pressed this button and it did not work,
+ * so it stays and says so.
  */
 export function describeUpdateBadge(
   phase: string,
   update: { version: string } | null,
   progress: { received: number; total: number },
+  input: UpdateBadgeInput = {},
 ): UpdateBadgeView | null {
+  const selfUpdating = input.selfUpdating ?? true;
+
   if (phase === 'ready') {
     return {
       tone: 'ready',
+      action: 'restart',
       label: update
-        ? `Version ${update.version} is installed — restart to finish`
-        : 'An update is installed — restart to finish',
+        ? `Version ${update.version} is installed — click to restart and finish`
+        : 'An update is installed — click to restart and finish',
     };
   }
+
   if (phase === 'downloading') {
-    return { tone: 'busy', label: `Downloading — ${describeDownload(progress.received, progress.total)}` };
+    return {
+      tone: 'busy',
+      action: 'none',
+      label: `Downloading — ${describeDownload(progress.received, progress.total)}`,
+    };
   }
+
+  if (phase === 'error' && input.downloadError) {
+    return {
+      tone: 'failed',
+      // Retrying is the only useful thing left, and it is one click away.
+      action: selfUpdating ? 'download' : 'release-page',
+      label: `${input.downloadError} Click to try again.`,
+    };
+  }
+
   if (phase === 'available' && update) {
-    return { tone: 'available', label: `Version ${update.version} is available — click to download it` };
+    if (!selfUpdating) {
+      return {
+        tone: 'available',
+        action: 'release-page',
+        label: `Version ${update.version} is available — click to open the release page. This copy was installed from a package, so it updates through your package manager.`,
+      };
+    }
+    return {
+      tone: 'available',
+      action: 'download',
+      label: `Version ${update.version} is available — click to download and install it`,
+    };
   }
+
   return null;
 }

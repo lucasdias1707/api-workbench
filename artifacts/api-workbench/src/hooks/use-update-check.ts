@@ -24,7 +24,15 @@ export type UpdateState = {
   update: AvailableUpdate | null;
   /** Bytes so far and the total, both zero until a download starts. */
   progress: { received: number; total: number };
-  error: string | null;
+  /**
+   * Which step failed, and why.
+   *
+   * The stage matters because the two failures deserve different treatment: a
+   * check that could not reach the release feed is worth mentioning in
+   * Settings and nowhere else, while a download that died was started by
+   * someone pressing a button and has to be reported on that button.
+   */
+  error: { stage: 'check' | 'download'; message: string } | null;
 };
 
 export type UpdateApi = UpdateState & {
@@ -106,7 +114,7 @@ export function useUpdateCheck(autoCheck: boolean): UpdateApi {
           phase: 'error',
           // Framed rather than raw: the underlying message is worth keeping for
           // anyone diagnosing this, but on its own it reads like a crash.
-          error: `Could not check for updates. ${detail(error)}`,
+          error: { stage: 'check', message: `Could not check for updates. ${detail(error)}` },
         });
       }
     })();
@@ -132,7 +140,7 @@ export function useUpdateCheck(autoCheck: boolean): UpdateApi {
           setState((inner) => ({
             ...inner,
             phase: 'error',
-            error: `The download did not finish. ${detail(error)}`,
+            error: { stage: 'download', message: `The download did not finish. ${detail(error)}` },
           }));
         }
       })();

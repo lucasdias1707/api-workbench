@@ -228,6 +228,10 @@ primeira tentativa quebrou.
 O workflow recusa publicar enquanto a pubkey estiver vazia ou o secret não existir: um app
 publicado sem chave pública nunca consegue verificar — e portanto aplicar — um update.
 
+A chave em uso é a minisign `8D6027C8903DED7`. Trocá-la ou apagá-la deixa toda instalação
+existente sem caminho de update; `src/__tests__/tauri-config.test.ts` falha se ela sumir do
+config.
+
 ### Assinatura (macOS e Windows)
 
 Os bundles não são assinados com um certificado pago, então o sistema não reconhece o

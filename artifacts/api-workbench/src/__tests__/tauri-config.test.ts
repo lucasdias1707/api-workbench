@@ -54,12 +54,14 @@ describe('updater configuration', () => {
     ]);
   });
 
-  it('has a public key of the right shape, or none at all', () => {
-    // Empty is the "no keypair yet" state. The workflow refuses to publish
-    // while it is empty, since an app shipped with no public key can never
-    // verify — and therefore never apply — an update.
+  it('carries the public key that updates are verified against', () => {
+    // Not optional any more, now that the keypair exists. An app shipped
+    // without this can never verify — and so never apply — an update, and the
+    // people who installed it are stuck until they reinstall by hand. Blanking
+    // it should fail here rather than at release time.
     const { pubkey } = config.plugins.updater;
-    if (pubkey === '') return;
     expect(pubkey).toMatch(/^[A-Za-z0-9+/=]{40,}$/);
+    // Base64 of the minisign .pub file, comment line included.
+    expect(Buffer.from(pubkey, 'base64').toString()).toContain('minisign public key');
   });
 });

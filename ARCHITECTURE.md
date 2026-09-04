@@ -175,7 +175,12 @@ barra de menu do macOS e a bandeja do Windows pedem.
 
 ## User preferences
 
-_Nenhuma preferência persistente registrada._
+Registradas em [`CLAUDE.md`](./CLAUDE.md), que é o arquivo que o Claude Code lê:
+
+- **Nunca escrever a URL da sessão** em lugar nenhum — commit, PR, comentário,
+  comentário de código ou documentação. Isso inclui o trailer `Claude-Session:`.
+- **Branches** seguem `claude/<descrição>`, e a palavra "replit" não aparece em
+  nada neste repositório.
 
 ## Gotchas
 

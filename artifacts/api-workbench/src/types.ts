@@ -165,6 +165,14 @@ export type Settings = {
    * and it never downloads anything on its own.
    */
   autoCheckUpdates: boolean;
+  /** Width of the request tree, in pixels. Dragged, and kept between sessions. */
+  sidebarWidth: number;
+  /**
+   * Hide the tree entirely. Deliberately a preference rather than something
+   * derived from the window size: a narrow window is a reason to offer the
+   * control, not a reason to decide for someone.
+   */
+  sidebarCollapsed: boolean;
   jsonTheme: JsonTheme;
 };
 

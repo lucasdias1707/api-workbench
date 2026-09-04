@@ -20,6 +20,7 @@ import { SettingsDialog } from '@/components/dialogs/SettingsDialog';
 import { ShortcutsDialog } from '@/components/dialogs/ShortcutsDialog';
 import { EnvironmentPicker } from '@/components/layout/EnvironmentPicker';
 import { FolderPane } from '@/components/layout/FolderPane';
+import { SidebarResizer } from '@/components/layout/SidebarResizer';
 import { UpdateBadge } from '@/components/layout/UpdateBadge';
 import { TabStrip } from '@/components/layout/TabStrip';
 import { RequestPane } from '@/components/request/RequestPane';
@@ -31,6 +32,7 @@ import { useProxyHealth } from '@/hooks/use-proxy-health';
 import { useSendRequest } from '@/hooks/use-send-request';
 import { useTheme } from '@/hooks/use-theme';
 import { createRequest } from '@/lib/factories';
+import { clampSidebarWidth } from '@/lib/sidebar';
 import { useWorkspace } from '@/state/workspace-store';
 
 type Overlay = 'palette' | 'environments' | 'settings' | 'curl' | 'postman' | 'shortcuts' | null;
@@ -41,7 +43,13 @@ export function Workbench() {
   const { status: proxyStatus } = useProxyHealth();
   const { sending, send, cancel, scriptLogs, scriptTests } = useSendRequest(proxyStatus);
   const [overlay, setOverlay] = useState<Overlay>(null);
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  // Kept in settings rather than component state: someone who narrows the
+  // window and hides the tree means it, and should not have to say so again on
+  // the next launch.
+  const sidebarVisible = !state.settings.sidebarCollapsed;
+  const sidebarWidth = clampSidebarWidth(state.settings.sidebarWidth);
+  const setSidebarVisible = (visible: boolean) =>
+    dispatch({ type: 'settings/update', patch: { sidebarCollapsed: !visible } });
 
   useTheme(state.settings.theme);
 
@@ -73,7 +81,7 @@ export function Workbench() {
     { key: 'enter', mod: true, allowInInput: true, handler: sendActive },
     { key: 'n', mod: true, allowInInput: true, handler: newRequest },
     { key: 'e', mod: true, allowInInput: true, handler: () => setOverlay('environments') },
-    { key: 'b', mod: true, allowInInput: true, handler: () => setSidebarVisible((current) => !current) },
+    { key: 'b', mod: true, allowInInput: true, handler: () => setSidebarVisible(!sidebarVisible) },
     { key: ',', mod: true, allowInInput: true, handler: () => setOverlay('settings') },
     {
       key: 'w',
@@ -111,6 +119,7 @@ export function Workbench() {
       data-sidebar={sidebarVisible ? 'visible' : 'hidden'}
       style={
         {
+          '--sidebar-w': `${sidebarWidth}px`,
           '--json-key': state.settings.jsonTheme.key,
           '--json-string': state.settings.jsonTheme.string,
           '--json-number': state.settings.jsonTheme.number,
@@ -120,13 +129,23 @@ export function Workbench() {
         } as React.CSSProperties
       }
     >
-      <Sidebar onImportCurl={() => setOverlay('curl')} onImportPostman={() => setOverlay('postman')} />
+      <Sidebar
+        onImportCurl={() => setOverlay('curl')}
+        onImportPostman={() => setOverlay('postman')}
+        onCollapse={() => setSidebarVisible(false)}
+      />
+      {sidebarVisible ? (
+        <SidebarResizer
+          width={sidebarWidth}
+          onChange={(width) => dispatch({ type: 'settings/update', patch: { sidebarWidth: width } })}
+        />
+      ) : null}
 
       <main className="main">
         <div className="topbar">
           <button
             className="icon-btn"
-            onClick={() => setSidebarVisible((current) => !current)}
+            onClick={() => setSidebarVisible(!sidebarVisible)}
             title={`Toggle sidebar (${MOD_LABEL} B)`}
             aria-label="Toggle sidebar"
             data-testid="button-toggle-sidebar"

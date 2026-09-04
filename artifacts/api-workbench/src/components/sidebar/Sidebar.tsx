@@ -37,7 +37,6 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
         workspaceId: state.activeWorkspaceId,
         folderId,
         name: 'New request',
-        url: '{{baseUrl}}/',
         sortIndex: state.requests.length,
       }),
     });

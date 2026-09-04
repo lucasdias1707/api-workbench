@@ -9,11 +9,23 @@ type UrlBarProps = {
   sending: boolean;
   onMethodChange: (method: HttpMethod) => void;
   onUrlChange: (url: string) => void;
+  /** Fired when the URL is done being edited, so its query can be extracted. */
+  onUrlCommit: (url: string) => void;
   onSend: () => void;
   onCancel: () => void;
 };
 
-export function UrlBar({ method, url, variables, sending, onMethodChange, onUrlChange, onSend, onCancel }: UrlBarProps) {
+export function UrlBar({
+  method,
+  url,
+  variables,
+  sending,
+  onMethodChange,
+  onUrlChange,
+  onUrlCommit,
+  onSend,
+  onCancel,
+}: UrlBarProps) {
   return (
     <div className="urlbar">
       <select
@@ -34,6 +46,7 @@ export function UrlBar({ method, url, variables, sending, onMethodChange, onUrlC
         value={url}
         table={variables}
         onChange={onUrlChange}
+        onCommit={onUrlCommit}
         onSubmit={onSend}
         placeholder="https://api.example.com/resource"
         ariaLabel="Request URL"

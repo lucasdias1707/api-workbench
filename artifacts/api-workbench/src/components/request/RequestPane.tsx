@@ -7,6 +7,7 @@ import { UrlBar } from '@/components/request/UrlBar';
 import { useToast } from '@/components/common/Toaster';
 import { toCurl } from '@/lib/curl';
 import { prepareRequest } from '@/lib/http';
+import { mergeParams, splitQuery } from '@/lib/query';
 import { folderPath } from '@/state/selectors';
 import { useWorkspace } from '@/state/workspace-store';
 import type { HttpMethod, KeyValue, RequestRecord } from '@/types';
@@ -66,6 +67,14 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
         sending={sending}
         onMethodChange={(method: HttpMethod) => patch({ method })}
         onUrlChange={(url) => patch({ url })}
+        onUrlCommit={(url) => {
+          // Query parameters written into the URL move into the Params table,
+          // where they can be toggled and edited. Sending puts them back, so
+          // leaving them in the URL as well would send each one twice.
+          const { base, params } = splitQuery(url);
+          if (params.length === 0) return;
+          patch({ url: base, params: mergeParams(request.params, params) });
+        }}
         onSend={onSend}
         onCancel={onCancel}
       />

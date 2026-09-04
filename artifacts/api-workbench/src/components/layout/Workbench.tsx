@@ -54,7 +54,6 @@ export function Workbench() {
         workspaceId: state.activeWorkspaceId,
         folderId: activeRequest?.folderId ?? null,
         name: 'New request',
-        url: '{{baseUrl}}/',
         sortIndex: state.requests.length,
       }),
     });

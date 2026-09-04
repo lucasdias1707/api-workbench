@@ -58,6 +58,7 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
+- `lib/query.ts` — move a query string da URL para a tabela de Params (e o `buildUrl` devolve)
 - `lib/updates.ts` — checagem, download e restart; único lugar que conhece o plugin do updater
 - `hooks/use-update-check.ts` — estados da checagem; checa no mount, nunca baixa sozinho
 - `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição

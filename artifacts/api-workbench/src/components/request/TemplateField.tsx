@@ -8,6 +8,12 @@ type TemplateFieldProps = {
   table: VariableTable;
   onChange: (value: string) => void;
   onSubmit?: () => void;
+  /**
+   * Called when the field is done being edited — on blur, and before Enter
+   * submits. Separate from `onChange` so a caller can rewrite the value
+   * without doing it under the caret on every keystroke.
+   */
+  onCommit?: (value: string) => void;
   placeholder?: string;
   ariaLabel: string;
   testId?: string;
@@ -28,6 +34,7 @@ export function TemplateField({
   table,
   onChange,
   onSubmit,
+  onCommit,
   placeholder,
   ariaLabel,
   testId,
@@ -88,10 +95,12 @@ export function TemplateField({
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         onScroll={(event) => setScrollLeft(event.currentTarget.scrollLeft)}
+        onBlur={(event) => onCommit?.(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === 'Enter' && onSubmit) {
+          if (event.key === 'Enter') {
             event.preventDefault();
-            onSubmit();
+            onCommit?.(event.currentTarget.value);
+            onSubmit?.();
           }
         }}
         aria-label={ariaLabel}

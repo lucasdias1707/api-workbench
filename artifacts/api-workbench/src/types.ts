@@ -140,6 +140,11 @@ export type Settings = {
   timeoutMs: number;
   /** Persist response bodies between reloads. */
   persistResponses: boolean;
+  /**
+   * Ask the release feed for a newer version when the app starts. Desktop only,
+   * and it never downloads anything on its own.
+   */
+  autoCheckUpdates: boolean;
   jsonTheme: JsonTheme;
 };
 

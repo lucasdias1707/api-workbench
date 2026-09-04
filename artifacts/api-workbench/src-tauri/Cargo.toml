@@ -1,13 +1,13 @@
 [package]
-name = "kavo"
-version = "0.1.2"
-description = "Kavo — a fast, keyboard-driven HTTP client"
-authors = ["Kavo"]
+name = "carom"
+version = "0.2.0"
+description = "Carom — a fast, keyboard-driven HTTP client"
+authors = ["Carom"]
 edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "kavo_lib"
+name = "carom_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -15,9 +15,20 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+# generate_context! expands the `plugins` block of tauri.conf.json into
+# serde_json values, so the crate has to have serde_json in scope for it.
+serde_json = "1"
+
 # Requests are made from Rust, which is what frees the desktop build from CORS
 # and lets it reach localhost and the LAN like any other native client.
 tauri-plugin-http = "2"
+
+# Self-update from the GitHub releases. Desktop only: there is nothing to
+# replace on mobile, and the plugins refuse to build for those targets.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+# Relaunches the app once an update has been swapped in.
+tauri-plugin-process = "2"
 
 [features]
 # Used by `tauri dev`; keeps the devtools out of release bundles.

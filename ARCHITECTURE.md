@@ -1,4 +1,4 @@
-# Kavo
+# Carom
 
 Um cliente HTTP no estilo desktop — inspirado no Yaak — para compor, organizar e enviar
 requisições com foco em teclado, tema escuro e leitura clara da resposta.
@@ -9,8 +9,8 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — sobe o servidor de apoio (porta 8080, ver `artifact.toml`)
-- `pnpm --filter @workspace/api-workbench run dev` — sobe o frontend
+- `pnpm --filter @workspace/api-server run dev` — sobe o servidor de apoio (`PORT=8080`)
+- `pnpm --filter @workspace/api-workbench run dev` — sobe o frontend (`PORT=21728`, `BASE_PATH=/`)
 - `pnpm run check` — typecheck + testes de todos os pacotes
 - `pnpm run test` — apenas os testes (Vitest)
 - `pnpm run typecheck` — typecheck completo
@@ -58,8 +58,29 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
+- `lib/updates.ts` — checagem, download e restart; único lugar que conhece o plugin do updater
+- `hooks/use-update-check.ts` — estados da checagem; checa no mount, nunca baixa sozinho
+- `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição
+- `lib/json-lexer.ts` — tokeniza JSON incompleto para colorir enquanto se digita
+- `lib/editor-keys.ts` — Tab, auto-fechamento de `{ [ "` e envolver seleção, como funções puras
+- `components/request/CodeEditor.tsx` — textarea transparente sobre um espelho colorido
 - `components/sidebar|request|response|dialogs|layout|common` — UI por área
 - `index.css` — design tokens (tema escuro e claro) e todos os componentes visuais
+
+### Brand
+
+`artifacts/api-workbench/brand/logo.svg` é a fonte. `public/favicon.svg` é a mesma arte sem
+o comentário, e `src/components/common/AppMark.tsx` é o mesmo desenho sem o fundo, com os
+traços em `currentColor` para servir o badge da sidebar e qualquer uso monocromático — os
+três precisam mudar juntos.
+
+Os ícones do app saem de `brand/logo.png` (rasterizado a 1024px) com
+`pnpm exec tauri icon brand/logo.png`, rodado de dentro de `artifacts/api-workbench`.
+O comando também gera `icons/android/` e `icons/ios/`; apague, não há alvo móvel.
+
+Restrições que o desenho respeita: sem gradiente (não sobrevive a 16px), traço com 11% da
+tela (a silhueta tem que aguentar tamanho de aba), e legível em uma cor só, que é o que a
+barra de menu do macOS e a bandeja do Windows pedem.
 
 ### Desktop (`artifacts/api-workbench/src-tauri`)
 
@@ -134,8 +155,14 @@ _Nenhuma preferência persistente registrada._
 
 ## Desktop
 
-O app se chama **Kavo** (os pacotes do workspace seguem com o nome `api-workbench`,
+O app se chama **Carom** (os pacotes do workspace seguem com o nome `api-workbench`,
 que é estrutura de repositório e não produto).
+
+Até a `v0.1.2` chamava-se Kavo. O renome levou junto o identificador do bundle
+(`dev.kavo.app` → `dev.carom.client`), que é o diretório de armazenamento da webview: quem
+vinha do Kavo começa com o workspace vazio e precisa exportar/importar. Trocar o
+identificador de novo tem o mesmo custo — não faça sem motivo. O sufixo `.app` saiu junto,
+que era do que o `tauri build` reclamava por colidir com a extensão de bundle do macOS.
 
 O executável é a forma mais completa de rodar: sem CORS, sem servidor de apoio e com acesso
 à rede local. `desktop:build` gera `.deb`, `.rpm` e `.AppImage` no Linux; o workflow
@@ -157,6 +184,54 @@ não aparecia no Linux. Desligar devolve o arrasto para a página, e não se per
 não tem nenhum recurso que aceite arquivo solto na janela. Coberto por
 `src/__tests__/tauri-config.test.ts`, já que JSON não tem onde escrever o motivo.
 
+### Atualização automática
+
+O app checa as releases do GitHub ao abrir, avisa quando há versão nova, e baixa **só se a
+pessoa clicar**. A checagem é desligável em Settings; o download nunca é automático.
+
+**Assinatura é obrigatória, não opcional.** O updater verifica uma assinatura minisign antes
+de instalar qualquer coisa. Existe uma chave privada que assina toda release (secrets
+`TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) e a pública fica embutida
+em `tauri.conf.json`. **Perder a privada trava todo mundo**: nenhum app instalado aceita
+update de outra chave, e a saída seria reinstalação manual em toda a base. Gerar com
+`pnpm --filter @workspace/api-workbench exec tauri signer generate -w <arquivo>`.
+
+Três armadilhas que já custaram tempo aqui:
+
+- **`bundle.createUpdaterArtifacts` vem desligado.** Sem ele a release sai com instaladores e
+  **nenhum** artefato de update, e todo app checando encontra nada. Coberto por
+  `src/__tests__/tauri-config.test.ts`.
+- **`tauri-action` apaga e substitui asset de mesmo nome.** Com quatro jobs de matriz
+  publicando na mesma release, cada um sobrescreve o `latest.json` do anterior e sobra uma
+  plataforma só — o update funcionaria em uma e falharia calado nas outras três. Por isso o
+  job `updater-manifest` roda **depois** da matriz e compõe o manifesto uma vez
+  (`scripts/src/updater-manifest.ts`), recusando-se a emitir manifesto parcial.
+- **`generate_context!` precisa de `serde_json` no crate** assim que existe um bloco
+  `plugins` no `tauri.conf.json`. Sem a dependência o build quebra com um erro que não
+  menciona plugin nenhum.
+
+**`.deb` e `.rpm` não se auto-atualizam** — os arquivos são do gerenciador de pacotes. O
+comando `install_kind` em `lib.rs` detecta isso (`$APPIMAGE` só existe dentro de um AppImage)
+e a UI troca o botão por um link para a release.
+
+**`createUpdaterArtifacts: true` exige chave privada e derruba o build inteiro sem ela** —
+publicando ou não, e independentemente de a pubkey estar preenchida ou vazia (verificado nos
+dois casos). Por isso o passo `Set up updater signing`, quando não há chave, escreve um
+`--config` desligando o flag só naquela run. O config versionado mantém o flag ligado, que é
+o estado que uma release precisa.
+
+A chave privada é exportada nesse mesmo passo, para o `$GITHUB_ENV`, e **só quando tem
+valor**: secret inexistente no Actions vira string vazia, não variável ausente, e o Tauri lê
+"definida mas vazia" como "assine com esta chave" e falha ao decodificá-la. Foi assim que a
+primeira tentativa quebrou.
+
+O workflow recusa publicar enquanto a pubkey estiver vazia ou o secret não existir: um app
+publicado sem chave pública nunca consegue verificar — e portanto aplicar — um update.
+
+A chave em uso é a minisign `8D6027C8903DED7`. Trocá-la ou apagá-la deixa toda instalação
+existente sem caminho de update; `src/__tests__/tauri-config.test.ts` falha se ela sumir do
+config.
+
 ### Assinatura (macOS e Windows)
 
 Os bundles não são assinados com um certificado pago, então o sistema não reconhece o
@@ -165,7 +240,7 @@ workflow) — isso não é cosmético: em Apple Silicon um `.app` arm64 *sem ass
 é rejeitado pelo Gatekeeper com a mensagem "está danificado e não pode ser aberto", que
 parece corrupção de download mas é falha de validação. Com ad-hoc a assinatura é válida e o
 primeiro run vira o aviso de que a Apple não conseguiu verificar o app, que dá para aceitar
-(`xattr -cr /Applications/Kavo.app`, ou Ajustes do Sistema → Privacidade e Segurança →
+(`xattr -cr /Applications/Carom.app`, ou Ajustes do Sistema → Privacidade e Segurança →
 Abrir Mesmo Assim; botão direito → Abrir não vale mais no macOS recente). O passo a passo
 para quem instala está no README. O step `Verify macOS signature` roda `codesign -dv` e
 `codesign --verify` no bundle e deixa a prova no log.

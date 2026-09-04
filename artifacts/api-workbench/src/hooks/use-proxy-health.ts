@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Base URL of the companion API server. It is same-origin in the Replit
- * preview (the router maps `/api` to the server) and can be pointed elsewhere
- * with `VITE_API_BASE_URL` for other setups.
+ * Base URL of the companion API server. Same-origin by default, which is how
+ * the dev server and a single-host deployment both serve it; point it
+ * elsewhere with `VITE_API_BASE_URL` when the API lives on another host.
  */
 export const PROXY_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, '') ?? '/api';
 

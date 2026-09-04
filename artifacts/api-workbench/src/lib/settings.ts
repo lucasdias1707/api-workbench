@@ -48,6 +48,7 @@ export function defaultSettings(): Settings {
     followRedirects: true,
     timeoutMs: 30_000,
     persistResponses: true,
+    autoCheckUpdates: true,
     jsonTheme: defaultJsonTheme(),
   };
 }

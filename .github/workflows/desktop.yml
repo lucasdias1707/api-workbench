@@ -75,6 +75,60 @@ jobs:
       # Linux leaves macOS and Windows with a rollup that cannot load itself.
       - run: pnpm install --frozen-lockfile
 
+      # An update is only accepted if it is signed by the key whose public half
+      # is baked into the app. Publishing without one produces installers that
+      # can never update themselves, and the people who install them are stuck
+      # there -- so refuse the release rather than ship that.
+      #
+      # The key is exported here rather than in the build step's `env:` because
+      # an unset secret is an empty string, not an absent variable, and Tauri
+      # reads "set but empty" as "sign with this key" and fails to decode it.
+      # Every build broke that way before this step existed.
+      - name: Set up updater signing
+        # Windows runners default to PowerShell, which parses this as PowerShell
+        # and fails on the first `if [`. It is the only step here that runs on
+        # every platform, so it is the only one that has to say so.
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PUBLISHING: ${{ (github.ref_type == 'tag' || inputs.publish) && 'yes' || 'no' }}
+        run: |
+          pubkey=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').plugins.updater.pubkey")
+
+          if [ "$PUBLISHING" = "yes" ]; then
+            if [ -z "$pubkey" ]; then
+              echo "::error::plugins.updater.pubkey is empty. Generate a keypair with 'tauri signer generate' and put the public half there."
+              exit 1
+            fi
+            if [ -z "$SIGNING_KEY" ]; then
+              echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set, so nothing would be signed and no app could apply the update."
+              exit 1
+            fi
+          fi
+
+          if [ -z "$SIGNING_KEY" ]; then
+            # createUpdaterArtifacts refuses to run without a private key, and
+            # that failure is fatal to the whole build -- so with no key, turn
+            # the artifacts off for this run rather than leave every non-publish
+            # build red. The committed config keeps them on, which is the state
+            # a release needs.
+            echo '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/no-updater.json"
+            echo "TAURI_EXTRA_ARGS=--config $RUNNER_TEMP/no-updater.json" >> "$GITHUB_ENV"
+            echo "No signing key: updater artifacts disabled for this run."
+            exit 0
+          fi
+
+          # Heredoc form: a minisign key is several lines.
+          {
+            echo "TAURI_SIGNING_PRIVATE_KEY<<TAURI_KEY_EOF"
+            echo "$SIGNING_KEY"
+            echo "TAURI_KEY_EOF"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<TAURI_PASSWORD_EOF"
+            echo "$SIGNING_PASSWORD"
+            echo "TAURI_PASSWORD_EOF"
+          } >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,38 +137,41 @@ jobs:
           # macOS reports it as "damaged"; ad-hoc makes the signature valid, so
           # the first run is an "unidentified developer" prompt the user can
           # accept. Removing the prompt needs a paid Developer ID plus
-          # notarization -- see the Desktop section of replit.md.
+          # notarization -- see the Desktop section of ARCHITECTURE.md.
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
+          # TAURI_SIGNING_PRIVATE_KEY is not listed here on purpose: the step
+          # above exports it into the job environment, and only when it has a
+          # value. See the comment there.
         with:
           projectPath: artifacts/api-workbench
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ env.TAURI_EXTRA_ARGS }}
           # Empty on a manual run with `publish` off, which makes tauri-action
           # build without touching releases. Otherwise __VERSION__ comes from
           # tauri.conf.json, so the tag and the installers always agree.
           tagName: ${{ (github.ref_type == 'tag' || inputs.publish) && 'v__VERSION__' || '' }}
-          releaseName: Kavo v__VERSION__
+          releaseName: Carom v__VERSION__
           releaseBody: |
-            Kavo — a fast, keyboard-driven HTTP client.
+            Carom — a fast, keyboard-driven HTTP client.
 
             Requests are made natively on the desktop, so there is no CORS
             restriction and hosts on your own network are reachable.
 
             | Platform | File |
             | --- | --- |
-            | macOS (Apple Silicon) | `Kavo_*_aarch64.dmg` |
-            | macOS (Intel) | `Kavo_*_x64.dmg` |
+            | macOS (Apple Silicon) | `Carom_*_aarch64.dmg` |
+            | macOS (Intel) | `Carom_*_x64.dmg` |
             | Windows | `.msi` or `.exe` |
             | Linux | `.AppImage`, `.deb` or `.rpm` |
 
             ### First run on macOS
 
-            macOS says it "could not verify Kavo is free of malware". The
+            macOS says it "could not verify Carom is free of malware". The
             bundles are signed ad-hoc, not with a paid Apple Developer ID, so
-            Gatekeeper cannot attest to the publisher. Drag Kavo to
+            Gatekeeper cannot attest to the publisher. Drag Carom to
             Applications, then either run:
 
             ```sh
-            xattr -cr /Applications/Kavo.app
+            xattr -cr /Applications/Carom.app
             ```
 
             or click **OK** on the warning and go to **System Settings ->
@@ -145,7 +202,57 @@ jobs:
       - name: Upload bundles
         uses: actions/upload-artifact@v4
         with:
-          name: kavo-${{ matrix.name }}
+          name: carom-${{ matrix.name }}
           path: artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           if-no-files-found: warn
           retention-days: 14
+
+  # tauri-action deletes and replaces any release asset of the same name, so the
+  # four matrix jobs each overwrite the previous one's latest.json and only the
+  # last platform survives. The app would then update on one platform and fail
+  # silently on the other three. Composing the manifest once, after every job,
+  # is the only way it describes all four.
+  updater-manifest:
+    needs: build
+    if: github.ref_type == 'tag' || inputs.publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Collect the signed bundles from every platform
+        uses: actions/download-artifact@v4
+        with:
+          pattern: carom-*
+          path: bundles
+
+      - name: Compose latest.json
+        id: compose
+        run: |
+          version=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          pnpm --filter @workspace/scripts exec tsx src/compose-updater-manifest.ts \
+            "$GITHUB_WORKSPACE/bundles" \
+            "$version" \
+            "${{ github.server_url }}/${{ github.repository }}" \
+            "$GITHUB_WORKSPACE/latest.json"
+          cat "$GITHUB_WORKSPACE/latest.json"
+
+      # Last write wins, and this is the last write.
+      - name: Attach it to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.compose.outputs.version }}
+          files: latest.json

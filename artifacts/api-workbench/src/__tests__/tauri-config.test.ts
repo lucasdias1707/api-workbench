@@ -20,14 +20,48 @@ import { describe, expect, it } from 'vitest';
  * with it off: the app has no feature that accepts files dropped onto the
  * window.
  */
-describe('tauri window configuration', () => {
-  const config = JSON.parse(
-    readFileSync(path.resolve(import.meta.dirname, '../../src-tauri/tauri.conf.json'), 'utf8'),
-  ) as { app: { windows: Array<{ dragDropEnabled?: boolean }> } };
+const config = JSON.parse(
+  readFileSync(path.resolve(import.meta.dirname, '../../src-tauri/tauri.conf.json'), 'utf8'),
+) as {
+  app: { windows: Array<{ dragDropEnabled?: boolean }> };
+  bundle: { createUpdaterArtifacts?: boolean };
+  plugins: { updater: { endpoints: string[]; pubkey: string } };
+};
 
+describe('tauri window configuration', () => {
   it('leaves drag and drop to the webview, so the sidebar can reorder requests', () => {
     for (const window of config.app.windows) {
       expect(window.dragDropEnabled).toBe(false);
     }
+  });
+});
+
+/**
+ * The updater is the one feature whose configuration cannot be exercised from
+ * a test run: it only does anything against a real signed release. These lock
+ * down the parts that would otherwise fail silently in production.
+ */
+describe('updater configuration', () => {
+  it('generates the signed bundles the updater downloads', () => {
+    // Off by default. Without it a release carries installers and no updater
+    // artifacts at all, and every app checking for updates finds nothing.
+    expect(config.bundle.createUpdaterArtifacts).toBe(true);
+  });
+
+  it('reads the manifest from the latest release', () => {
+    expect(config.plugins.updater.endpoints).toEqual([
+      'https://github.com/lucasdias1707/api-workbench/releases/latest/download/latest.json',
+    ]);
+  });
+
+  it('carries the public key that updates are verified against', () => {
+    // Not optional any more, now that the keypair exists. An app shipped
+    // without this can never verify — and so never apply — an update, and the
+    // people who installed it are stuck until they reinstall by hand. Blanking
+    // it should fail here rather than at release time.
+    const { pubkey } = config.plugins.updater;
+    expect(pubkey).toMatch(/^[A-Za-z0-9+/=]{40,}$/);
+    // Base64 of the minisign .pub file, comment line included.
+    expect(Buffer.from(pubkey, 'base64').toString()).toContain('minisign public key');
   });
 });

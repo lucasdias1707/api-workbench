@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Download, FilePlus2, FolderPlus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { AuthEditor } from '@/components/request/AuthEditor';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
 import { ScriptEditor } from '@/components/request/ScriptEditor';
@@ -8,6 +9,7 @@ import { exportFileName, exportFolder } from '@/lib/export';
 import { createFolder, createRequest } from '@/lib/factories';
 import { LOCAL_VARIABLE_COLOR } from '@/lib/template';
 import { folderPath } from '@/state/selectors';
+import { useDeleteWithUndo } from '@/hooks/use-delete-with-undo';
 import { useWorkspace } from '@/state/workspace-store';
 import type { Auth, Folder } from '@/types';
 
@@ -28,8 +30,10 @@ const TABS: Array<{ id: FolderTab; label: string }> = [
  * That is the whole reason a folder is a unit and not just a label.
  */
 export function FolderPane({ folder }: { folder: Folder }) {
-  const { state, dispatch, chainFor } = useWorkspace();
+  const { state, dispatch, chainFor, tableFor } = useWorkspace();
   const [tab, setTab] = useState<FolderTab>('variables');
+  const [confirming, setConfirming] = useState(false);
+  const deleteWithUndo = useDeleteWithUndo();
 
   const patch = (changes: Partial<Folder>) => dispatch({ type: 'folder/update', id: folder.id, patch: changes });
 
@@ -104,7 +108,7 @@ export function FolderPane({ folder }: { folder: Folder }) {
         </button>
         <button
           className="icon-btn danger"
-          onClick={() => dispatch({ type: 'folder/delete', id: folder.id })}
+          onClick={() => setConfirming(true)}
           title="Delete folder"
           aria-label="Delete folder"
           data-testid="button-folder-delete"
@@ -162,6 +166,7 @@ export function FolderPane({ folder }: { folder: Folder }) {
             onChange={(auth: Auth) => patch({ auth })}
             chain={ancestors}
             subject="folder"
+            variables={tableFor(folder.id)}
           />
         ) : null}
 
@@ -196,6 +201,26 @@ export function FolderPane({ folder }: { folder: Folder }) {
           </div>
         ) : null}
       </div>
+      {confirming ? (
+        <ConfirmDialog
+          title="Delete this folder?"
+          message={
+            <>
+              <strong>{folder.name}</strong> takes everything inside it with it: {nestedCount} request
+              {nestedCount === 1 ? '' : 's'} and any folders nested below. You can undo this from the notification
+              straight afterwards.
+            </>
+          }
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            deleteWithUndo(
+              { type: 'folder/delete', id: folder.id },
+              { title: `Deleted ${folder.name}`, detail: 'Everything inside it went too.' },
+            );
+            setConfirming(false);
+          }}
+        />
+      ) : null}
     </section>
   );
 }

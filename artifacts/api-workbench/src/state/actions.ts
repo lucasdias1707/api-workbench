@@ -2,9 +2,16 @@ import type { Environment, Folder, KeyValue, RequestRecord, ResponseRecord, Sett
 
 export type Action =
   | { type: 'state/replace'; state: WorkspaceState }
+  /**
+   * Put back whatever a delete removed, by re-adding anything in `previous`
+   * that is no longer present. Deliberately not a rollback: edits made to
+   * surviving records while the undo toast was up are kept.
+   */
+  | { type: 'restore'; previous: WorkspaceState }
   | { type: 'request/open'; id: string }
   | { type: 'request/close-tab'; id: string }
   | { type: 'request/close-other-tabs'; id: string }
+  | { type: 'request/close-all-tabs' }
   | { type: 'request/update'; id: string; patch: Partial<RequestRecord> }
   | { type: 'request/create'; request: RequestRecord }
   | { type: 'request/duplicate'; id: string }

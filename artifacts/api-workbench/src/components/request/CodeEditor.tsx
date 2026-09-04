@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { changedSpan, handleEditorKey } from '@/lib/editor-keys';
-import { lexJson } from '@/lib/json-lexer';
+import { mirrorTokens } from '@/lib/mirror-tokens';
+import type { VariableTable } from '@/types';
 
 type CodeEditorProps = {
   value: string;
@@ -12,6 +13,12 @@ type CodeEditorProps = {
   testId?: string;
   invalid?: boolean;
   style?: CSSProperties;
+  /**
+   * Resolved variables, so `{{name}}` is drawn as a variable here too — red
+   * when it resolves to nothing. Omit it and the text is coloured but no
+   * variable is marked, which is what a caller with nothing to resolve wants.
+   */
+  variables?: VariableTable;
 };
 
 /**
@@ -33,6 +40,7 @@ export function CodeEditor({
   testId,
   invalid,
   style,
+  variables,
 }: CodeEditorProps) {
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -95,18 +103,19 @@ export function CodeEditor({
     applyEdit(edit);
   };
 
-  const tokens = language === 'json' ? lexJson(value) : null;
+  const tokens = mirrorTokens(value, language, variables ?? {});
 
   return (
     <div className={`code-editor ${invalid ? 'invalid' : ''}`} style={style}>
       <div className="code-mirror" ref={mirrorRef} aria-hidden="true">
-        {tokens
-          ? tokens.map((token, index) => (
-              <span key={index} className={`jt-${token.kind}`}>
-                {token.text}
-              </span>
-            ))
-          : value}
+        {tokens.map((token, index) => (
+          <span
+            key={index}
+            className={`jt-${token.kind}${token.variable ? ` jt-var${token.variable.defined ? '' : ' missing'}` : ''}`}
+          >
+            {token.text}
+          </span>
+        ))}
         {/* A trailing newline collapses in a div but not in a textarea; this
             keeps the last line of the two in the same place. */}
         {'\n'}

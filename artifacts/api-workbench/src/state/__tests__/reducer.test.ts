@@ -207,6 +207,114 @@ describe('the folder pane', () => {
   });
 });
 
+describe('undoing a delete', () => {
+  it('puts a deleted request back, with its tab and its responses', () => {
+    const state = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const target = state.requests[0];
+    const withResponse = reducer(state, { type: 'response/add', response: response(target.id) });
+
+    const deleted = reducer(withResponse, { type: 'request/delete', id: target.id });
+    expect(deleted.requests.some((item) => item.id === target.id)).toBe(false);
+
+    const undone = reducer(deleted, { type: 'restore', previous: withResponse });
+    expect(undone.requests.some((item) => item.id === target.id)).toBe(true);
+    expect(undone.openTabIds).toContain(target.id);
+    expect(undone.responses.some((item) => item.requestId === target.id)).toBe(true);
+  });
+
+  it('puts a folder back with everything that went with it', () => {
+    const state = seed();
+    const folder = state.folders.find((item) => item.parentId !== null)!;
+    const inside = state.requests.filter((request) => request.folderId === folder.id);
+    expect(inside.length).toBeGreaterThan(0);
+
+    const deleted = reducer(state, { type: 'folder/delete', id: folder.id });
+    const undone = reducer(deleted, { type: 'restore', previous: state });
+
+    expect(undone.folders.some((item) => item.id === folder.id)).toBe(true);
+    for (const request of inside) {
+      expect(undone.requests.some((item) => item.id === request.id)).toBe(true);
+    }
+  });
+
+  it('keeps an edit made while the undo was still offered', () => {
+    // The snapshot is not a rollback: typing into a surviving request during
+    // the toast must not be thrown away by pressing Undo.
+    const state = seed();
+    const doomed = state.requests[0];
+    const survivor = state.requests[1];
+
+    const deleted = reducer(state, { type: 'request/delete', id: doomed.id });
+    const edited = reducer(deleted, { type: 'request/update', id: survivor.id, patch: { name: 'Renamed mid-undo' } });
+    const undone = reducer(edited, { type: 'restore', previous: state });
+
+    expect(undone.requests.find((item) => item.id === survivor.id)?.name).toBe('Renamed mid-undo');
+    expect(undone.requests.some((item) => item.id === doomed.id)).toBe(true);
+  });
+
+  it('puts a deleted environment back', () => {
+    const state = seed();
+    const environment = createEnvironment(state.activeWorkspaceId, 'Staging', false, [row('a', '1')]);
+    const added = reducer(state, { type: 'environment/create', environment });
+    const deleted = reducer(added, { type: 'environment/delete', id: environment.id });
+    const undone = reducer(deleted, { type: 'restore', previous: added });
+    expect(undone.environments.some((item) => item.id === environment.id)).toBe(true);
+  });
+
+  it('restores a deleted workspace and returns to it', () => {
+    const state = seed();
+    const second = createWorkspace('Second');
+    const withSecond = reducer(state, {
+      type: 'workspace/create',
+      workspace: second,
+      environment: createEnvironment(second.id, 'Base', true, []),
+    });
+    const deleted = reducer(withSecond, { type: 'workspace/delete', id: second.id });
+    const undone = reducer(deleted, { type: 'restore', previous: withSecond });
+
+    expect(undone.workspaces.some((item) => item.id === second.id)).toBe(true);
+    expect(undone.activeWorkspaceId).toBe(withSecond.activeWorkspaceId);
+  });
+
+  it('does not reopen a tab for a request that is still gone', () => {
+    // Restoring after two deletes, with a snapshot from before only one of
+    // them, must not leave the tab strip pointing at nothing.
+    const opened = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
+    const first = opened.requests[0];
+    const snapshot = opened;
+    const deleted = reducer(opened, { type: 'request/delete', id: first.id });
+    const undone = reducer(deleted, { type: 'restore', previous: snapshot });
+    expect(undone.openTabIds.every((id) => undone.requests.some((request) => request.id === id))).toBe(true);
+  });
+});
+
+describe('closing tabs', () => {
+  it('closes every tab at once', () => {
+    let state = seed();
+    for (const request of state.requests.slice(0, 3)) {
+      state = reducer(state, { type: 'request/open', id: request.id });
+    }
+    expect(state.openTabIds.length).toBe(3);
+
+    const closed = reducer(state, { type: 'request/close-all-tabs' });
+    expect(closed.openTabIds).toEqual([]);
+    expect(closed.activeRequestId).toBeNull();
+    // The requests themselves are untouched — a tab is a view, not the thing.
+    expect(closed.requests).toEqual(state.requests);
+  });
+
+  it('closes everything except the one named, and focuses it', () => {
+    let state = seed();
+    for (const request of state.requests.slice(0, 3)) {
+      state = reducer(state, { type: 'request/open', id: request.id });
+    }
+    const keep = state.openTabIds[0];
+    const closed = reducer(state, { type: 'request/close-other-tabs', id: keep });
+    expect(closed.openTabIds).toEqual([keep]);
+    expect(closed.activeRequestId).toBe(keep);
+  });
+});
+
 describe('importing a tree', () => {
   it('appends folders, requests and the environment in one step', () => {
     const state = seed();

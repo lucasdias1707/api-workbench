@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Braces, ChevronDown, ChevronRight, Copy, Download, FilePlus2, FolderInput, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Copy, Download, FilePlus2, FolderInput, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { PromptDialog } from '@/components/common/PromptDialog';
 import { downloadJson } from '@/lib/download';
@@ -7,6 +8,7 @@ import { exportFileName, exportFolder, exportRequest } from '@/lib/export';
 import { createFolder, createRequest } from '@/lib/factories';
 import { buildTree, countRequests, isDescendantFolder, type TreeNode } from '@/state/selectors';
 import { WorkspaceMenu } from '@/components/sidebar/WorkspaceMenu';
+import { useDeleteWithUndo } from '@/hooks/use-delete-with-undo';
 import { useWorkspace } from '@/state/workspace-store';
 import type { Folder, RequestRecord } from '@/types';
 
@@ -17,12 +19,16 @@ type PromptState =
   | { kind: 'rename-request'; request: RequestRecord }
   | null;
 
+type ConfirmState = { kind: 'folder'; folder: Folder } | { kind: 'request'; request: RequestRecord } | null;
+
 export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () => void; onImportPostman: () => void }) {
   const { state, dispatch } = useWorkspace();
+  const deleteWithUndo = useDeleteWithUndo();
   const [search, setSearch] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<MenuState>(null);
   const [prompt, setPrompt] = useState<PromptState>(null);
+  const [confirming, setConfirming] = useState<ConfirmState>(null);
   /** What is being dragged, and which row it is currently hovering. */
   const [dragging, setDragging] = useState<{ kind: 'request' | 'folder'; id: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -52,6 +58,38 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
     dispatch({ type: 'folder/open', id: folderId });
   };
 
+  /**
+   * Collapse everything, or open everything.
+   *
+   * Which one the button does is decided by what is on screen: if anything is
+   * still open it collapses, otherwise it expands. One button, and it always
+   * does the thing that changes what you can see.
+   */
+  const workspaceFolders = state.folders.filter((item) => item.workspaceId === state.activeWorkspaceId);
+
+  /** How many requests a folder would take with it, however deep they sit. */
+  const requestsUnder = (folderId: string) => {
+    const subtree = new Set([folderId]);
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const item of workspaceFolders) {
+        if (item.parentId && subtree.has(item.parentId) && !subtree.has(item.id)) {
+          subtree.add(item.id);
+          grew = true;
+        }
+      }
+    }
+    return state.requests.filter((request) => request.folderId && subtree.has(request.folderId)).length;
+  };
+  const anyExpanded = workspaceFolders.some((item) => !collapsed[item.id]);
+  const toggleAll = () => {
+    if (!anyExpanded) {
+      setCollapsed({});
+      return;
+    }
+    setCollapsed(Object.fromEntries(workspaceFolders.map((item) => [item.id, true])));
+  };
+
   const saveFolder = (folder: Folder) => {
     const payload = exportFolder(state, folder.id);
     if (payload) downloadJson(exportFileName(folder.name), payload);
@@ -79,7 +117,7 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
       label: 'Delete folder',
       icon: <Trash2 size={13} />,
       danger: true,
-      onSelect: () => dispatch({ type: 'folder/delete', id: folder.id }),
+      onSelect: () => setConfirming({ kind: 'folder', folder }),
     },
   ];
 
@@ -93,7 +131,7 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
       label: 'Delete request',
       icon: <Trash2 size={13} />,
       danger: true,
-      onSelect: () => dispatch({ type: 'request/delete', id: request.id }),
+      onSelect: () => setConfirming({ kind: 'request', request }),
     },
   ];
 
@@ -251,6 +289,16 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
         <button
           className="icon-btn"
           style={{ marginLeft: 'auto' }}
+          onClick={toggleAll}
+          disabled={workspaceFolders.length === 0}
+          title={anyExpanded ? 'Collapse all folders' : 'Expand all folders'}
+          aria-label={anyExpanded ? 'Collapse all folders' : 'Expand all folders'}
+          data-testid="button-toggle-all-folders"
+        >
+          {anyExpanded ? <ChevronsDownUp size={15} /> : <ChevronsUpDown size={15} />}
+        </button>
+        <button
+          className="icon-btn"
           onClick={() => setPrompt({ kind: 'new-folder', parentId: null })}
           title="New folder"
           aria-label="New folder"
@@ -312,6 +360,48 @@ export function Sidebar({ onImportCurl, onImportPostman }: { onImportCurl: () =>
       </div>
 
       {menu ? <ContextMenu x={menu.x} y={menu.y} entries={menu.entries} onClose={() => setMenu(null)} /> : null}
+
+      {confirming?.kind === 'request' ? (
+        <ConfirmDialog
+          title="Delete this request?"
+          message={
+            <>
+              <strong>{confirming.request.name}</strong> and its response history will be removed. You can undo this
+              from the notification straight afterwards.
+            </>
+          }
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            deleteWithUndo(
+              { type: 'request/delete', id: confirming.request.id },
+              { title: `Deleted ${confirming.request.name}` },
+            );
+            setConfirming(null);
+          }}
+        />
+      ) : null}
+
+      {confirming?.kind === 'folder' ? (
+        <ConfirmDialog
+          title="Delete this folder?"
+          message={
+            <>
+              <strong>{confirming.folder.name}</strong> takes everything inside it with it:{' '}
+              {requestsUnder(confirming.folder.id)} request
+              {requestsUnder(confirming.folder.id) === 1 ? '' : 's'} and any folders nested below. You can undo this
+              from the notification straight afterwards.
+            </>
+          }
+          onCancel={() => setConfirming(null)}
+          onConfirm={() => {
+            deleteWithUndo(
+              { type: 'folder/delete', id: confirming.folder.id },
+              { title: `Deleted ${confirming.folder.name}`, detail: 'Everything inside it went too.' },
+            );
+            setConfirming(null);
+          }}
+        />
+      ) : null}
 
       {prompt?.kind === 'new-folder' ? (
         <PromptDialog

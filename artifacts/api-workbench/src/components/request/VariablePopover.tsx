@@ -53,6 +53,13 @@ export function VariablePopover({ name, variable, anchor, onClose }: VariablePop
     (environment) => environment.workspaceId === state.activeWorkspaceId,
   );
   const base = environments.find((environment) => environment.isBase);
+  /**
+   * A new global goes into whichever environment is selected right now, and
+   * only falls back to Base when none is. Defining a staging URL while staging
+   * is active, and having it land in Base for every environment to inherit,
+   * is not what anyone means by that click.
+   */
+  const target = environments.find((environment) => environment.id === state.activeEnvironmentId) ?? base;
   const folder = state.folders.find((item) => item.id === activeRequest?.folderId);
 
   const save = () => {
@@ -78,11 +85,15 @@ export function VariablePopover({ name, variable, anchor, onClose }: VariablePop
     onClose();
   };
 
-  const define = (scope: 'folder' | 'base') => {
+  const define = (scope: 'folder' | 'global') => {
     if (scope === 'folder' && folder) {
       dispatch({ type: 'folder/variables', id: folder.id, variables: [...folder.variables, row(name, value)] });
-    } else if (base) {
-      dispatch({ type: 'environment/update', id: base.id, patch: { variables: [...base.variables, row(name, value)] } });
+    } else if (target) {
+      dispatch({
+        type: 'environment/update',
+        id: target.id,
+        patch: { variables: [...target.variables, row(name, value)] },
+      });
     }
     onClose();
   };
@@ -168,8 +179,14 @@ export function VariablePopover({ name, variable, anchor, onClose }: VariablePop
             >
               <Plus size={12} /> Local {folder ? `(${folder.name})` : ''}
             </button>
-            <button className="btn btn-sm" onClick={() => define('base')} disabled={!base} data-testid="button-define-global">
-              <Plus size={12} /> Global (Base)
+            <button
+              className="btn btn-sm"
+              onClick={() => define('global')}
+              disabled={!target}
+              title={target ? `Goes into the ${target.name} environment` : 'This workspace has no environment'}
+              data-testid="button-define-global"
+            >
+              <Plus size={12} /> Global {target ? `(${target.name})` : ''}
             </button>
           </div>
         </>

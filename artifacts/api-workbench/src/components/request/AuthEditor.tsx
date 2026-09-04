@@ -1,5 +1,6 @@
+import { TemplateField } from '@/components/request/TemplateField';
 import { resolveAuth } from '@/lib/inherit';
-import type { Auth, AuthType, Folder } from '@/types';
+import type { Auth, AuthType, Folder, VariableTable } from '@/types';
 
 const AUTH_LABELS: Record<AuthType, string> = {
   inherit: 'Inherit from parent',
@@ -19,9 +20,16 @@ type AuthEditorProps = {
   chain?: Folder[];
   /** What the thing being edited is, for the copy. */
   subject: 'request' | 'folder';
+  /**
+   * Resolved variables, so a credential written as `{{token}}` reads the same
+   * here as in the URL bar: coloured, hoverable, and red when it resolves to
+   * nothing. Interpolation always worked — what was missing was any sign that
+   * a typo like `{{tokne}}` would be sent literally.
+   */
+  variables: VariableTable;
 };
 
-export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorProps) {
+export function AuthEditor({ auth, onChange, chain = [], subject, variables }: AuthEditorProps) {
   const setAuth = (patch: Partial<Auth>) => onChange({ ...auth, ...patch });
   const inherited = resolveAuth({ ...auth, type: 'inherit' }, chain);
   const canInherit = chain.length > 0;
@@ -89,13 +97,13 @@ export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorPr
           <span className="section-label" style={{ margin: 0 }}>
             Token
           </span>
-          <input
-            className="field mono"
+          <TemplateField
             value={auth.token}
-            spellCheck={false}
+            table={variables}
+            onChange={(token) => setAuth({ token })}
             placeholder="{{token}}"
-            onChange={(event) => setAuth({ token: event.target.value })}
-            data-testid="input-auth-token"
+            ariaLabel="Bearer token"
+            testId="input-auth-token"
           />
         </label>
       ) : null}
@@ -106,18 +114,23 @@ export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorPr
             <span className="section-label" style={{ margin: 0 }}>
               Username
             </span>
-            <input
-              className="field mono"
+            <TemplateField
               value={auth.username}
-              spellCheck={false}
-              onChange={(event) => setAuth({ username: event.target.value })}
-              data-testid="input-auth-username"
+              table={variables}
+              onChange={(username) => setAuth({ username })}
+              ariaLabel="Username"
+              testId="input-auth-username"
             />
           </label>
           <label className="stack" style={{ gap: 6 }}>
             <span className="section-label" style={{ margin: 0 }}>
               Password
             </span>
+            {/*
+              The only field left masked, so a password typed in by hand is not
+              on screen. A `{{variable}}` still resolves here — it just cannot
+              be shown as a chip without unmasking everything around it.
+            */}
             <input
               className="field mono"
               type="password"
@@ -135,25 +148,25 @@ export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorPr
             <span className="section-label" style={{ margin: 0 }}>
               Key name
             </span>
-            <input
-              className="field mono"
+            <TemplateField
               value={auth.apiKeyName}
-              spellCheck={false}
+              table={variables}
+              onChange={(apiKeyName) => setAuth({ apiKeyName })}
               placeholder="X-Api-Key"
-              onChange={(event) => setAuth({ apiKeyName: event.target.value })}
-              data-testid="input-auth-key-name"
+              ariaLabel="Key name"
+              testId="input-auth-key-name"
             />
           </label>
           <label className="stack" style={{ gap: 6 }}>
             <span className="section-label" style={{ margin: 0 }}>
               Key value
             </span>
-            <input
-              className="field mono"
+            <TemplateField
               value={auth.apiKeyValue}
-              spellCheck={false}
-              onChange={(event) => setAuth({ apiKeyValue: event.target.value })}
-              data-testid="input-auth-key-value"
+              table={variables}
+              onChange={(apiKeyValue) => setAuth({ apiKeyValue })}
+              ariaLabel="Key value"
+              testId="input-auth-key-value"
             />
           </label>
           <label className="stack" style={{ gap: 6 }}>
@@ -176,7 +189,7 @@ export function AuthEditor({ auth, onChange, chain = [], subject }: AuthEditorPr
       {auth.type !== 'inherit' ? (
         <p className="hint">
           Credentials support <code>{'{{variables}}'}</code>, so tokens can live in an environment instead of the{' '}
-          {subject}.
+          {subject}. A variable that resolves to nothing is drawn in red — click it to give it a value.
         </p>
       ) : null}
     </div>

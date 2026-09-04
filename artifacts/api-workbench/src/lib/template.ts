@@ -1,6 +1,6 @@
 import type { Environment, Folder, KeyValue, ResolvedVariable, VariableOrigin, VariableTable } from '@/types';
 
-const VARIABLE_PATTERN = /\{\{\s*([^}\s][^}]*?)\s*\}\}/g;
+export const VARIABLE_PATTERN = /\{\{\s*([^}\s][^}]*?)\s*\}\}/g;
 
 /** Folder-scoped variables are always drawn in this blue, whatever else changes. */
 export const LOCAL_VARIABLE_COLOR = '#4d90d8';

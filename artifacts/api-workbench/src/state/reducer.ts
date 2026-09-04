@@ -62,6 +62,35 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
     case 'state/replace':
       return action.state;
 
+    case 'restore': {
+      const previous = action.previous;
+      // Re-add only what is missing. Anything still present was either never
+      // deleted or was edited since, and the edit is newer than the snapshot.
+      const missing = <T extends { id: string }>(current: T[], saved: T[]): T[] => {
+        const have = new Set(current.map((item) => item.id));
+        const back = saved.filter((item) => !have.has(item.id));
+        return back.length === 0 ? current : [...current, ...back];
+      };
+
+      const requests = missing(state.requests, previous.requests);
+      const restoredIds = new Set(requests.map((request) => request.id));
+      return {
+        ...state,
+        workspaces: missing(state.workspaces, previous.workspaces),
+        folders: missing(state.folders, previous.folders),
+        requests,
+        environments: missing(state.environments, previous.environments),
+        responses: missing(state.responses, previous.responses),
+        // The tab strip is an ordered list, so it is restored rather than
+        // merged — but only for requests that actually exist again.
+        openTabIds: previous.openTabIds.filter((id) => restoredIds.has(id)),
+        activeRequestId: previous.activeRequestId,
+        activeFolderId: previous.activeFolderId,
+        activeWorkspaceId: previous.activeWorkspaceId,
+        activeEnvironmentId: previous.activeEnvironmentId,
+      };
+    }
+
     case 'request/open':
       return withTabOpen(state, action.id);
 
@@ -72,6 +101,9 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
 
     case 'request/close-other-tabs':
       return { ...state, openTabIds: [action.id], activeRequestId: action.id };
+
+    case 'request/close-all-tabs':
+      return { ...state, openTabIds: [], activeRequestId: null };
 
     case 'request/update':
       return {

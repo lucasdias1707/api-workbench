@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Wand2 } from 'lucide-react';
 import { CodeEditor } from '@/components/request/CodeEditor';
+import { useWorkspace } from '@/state/workspace-store';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
 import { tryPrettyJson } from '@/lib/format';
 import type { BodyType, KeyValue, RequestRecord } from '@/types';
@@ -22,6 +23,7 @@ type BodyEditorProps = {
 };
 
 export function BodyEditor({ request, onChange }: BodyEditorProps) {
+  const { variableTable } = useWorkspace();
   const jsonError = useMemo(() => {
     if (request.bodyType !== 'json' || !request.body.trim()) return null;
     try {
@@ -86,6 +88,7 @@ export function BodyEditor({ request, onChange }: BodyEditorProps) {
           <div>
             <div className="section-label">Query</div>
             <CodeEditor
+              variables={variableTable}
               value={request.graphql.query}
               onChange={(query) => onChange({ graphql: { ...request.graphql, query } })}
               ariaLabel="GraphQL query"
@@ -95,6 +98,7 @@ export function BodyEditor({ request, onChange }: BodyEditorProps) {
           <div>
             <div className="section-label">Variables (JSON)</div>
             <CodeEditor
+              variables={variableTable}
               value={request.graphql.variables}
               onChange={(variables) => onChange({ graphql: { ...request.graphql, variables } })}
               language="json"
@@ -109,6 +113,7 @@ export function BodyEditor({ request, onChange }: BodyEditorProps) {
       {(['json', 'text', 'xml'] as BodyType[]).includes(request.bodyType) ? (
         <div>
           <CodeEditor
+            variables={variableTable}
             value={request.body}
             onChange={(body) => onChange({ body })}
             language={request.bodyType === 'json' ? 'json' : 'plain'}

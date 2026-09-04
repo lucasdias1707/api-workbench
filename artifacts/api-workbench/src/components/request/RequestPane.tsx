@@ -160,7 +160,13 @@ export function RequestPane({ request, sending, onSend, onCancel }: RequestPaneP
 
         {tab === 'body' ? <BodyEditor request={request} onChange={patch} /> : null}
         {tab === 'auth' ? (
-          <AuthEditor auth={request.auth} onChange={(auth: Auth) => patch({ auth })} chain={chain} subject="request" />
+          <AuthEditor
+            auth={request.auth}
+            onChange={(auth: Auth) => patch({ auth })}
+            chain={chain}
+            subject="request"
+            variables={variableTable}
+          />
         ) : null}
 
         {tab === 'scripts' ? (

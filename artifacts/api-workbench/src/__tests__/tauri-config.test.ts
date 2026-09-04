@@ -50,7 +50,7 @@ describe('updater configuration', () => {
 
   it('reads the manifest from the latest release', () => {
     expect(config.plugins.updater.endpoints).toEqual([
-      'https://github.com/lucasdias1707/api-workbench/releases/latest/download/latest.json',
+      'https://github.com/lucasdias1707/carom-client-api/releases/latest/download/latest.json',
     ]);
   });
 

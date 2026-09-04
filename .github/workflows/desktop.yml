@@ -185,7 +185,7 @@ jobs:
             choose **More info -> Run anyway**.
 
             Full instructions, and what it would take to remove the prompts,
-            are in the [README](https://github.com/lucasdias1707/api-workbench#readme).
+            are in the [README](https://github.com/lucasdias1707/carom-client-api#readme).
           releaseDraft: false
           prerelease: false
 

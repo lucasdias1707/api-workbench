@@ -212,6 +212,11 @@ jobs:
   # last platform survives. The app would then update on one platform and fail
   # silently on the other three. Composing the manifest once, after every job,
   # is the only way it describes all four.
+  #
+  # It reads the release's own asset list rather than the build output: the
+  # bundler also writes an .AppImage.tar.gz that never reaches the release, and
+  # lowercase copies of every bundle that collide inside a workflow artifact
+  # zip. Either one produces a manifest that looks complete and 404s.
   updater-manifest:
     needs: build
     if: github.ref_type == 'tag' || inputs.publish
@@ -232,21 +237,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Collect the signed bundles from every platform
-        uses: actions/download-artifact@v4
-        with:
-          pattern: carom-*
-          path: bundles
-
       - name: Compose latest.json
         id: compose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           version=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           pnpm --filter @workspace/scripts exec tsx src/compose-updater-manifest.ts \
-            "$GITHUB_WORKSPACE/bundles" \
+            "${{ github.repository }}" \
             "$version" \
-            "${{ github.server_url }}/${{ github.repository }}" \
             "$GITHUB_WORKSPACE/latest.json"
           cat "$GITHUB_WORKSPACE/latest.json"
 

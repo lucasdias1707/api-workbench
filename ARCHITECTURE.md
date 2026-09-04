@@ -206,6 +206,11 @@ Três armadilhas que já custaram tempo aqui:
   plataforma só — o update funcionaria em uma e falharia calado nas outras três. Por isso o
   job `updater-manifest` roda **depois** da matriz e compõe o manifesto uma vez
   (`scripts/src/updater-manifest.ts`), recusando-se a emitir manifesto parcial.
+- **O manifesto é montado a partir dos assets da release, não da pasta de build.** Os dois
+  conjuntos não são iguais: o bundler também escreve um `.AppImage.tar.gz` que o
+  `tauri-action` **não** publica, e cópias em minúsculo de cada bundle que colidem por
+  case-insensitivity dentro do zip de artefato do Actions. Apontar para qualquer um deles
+  gera um manifesto que parece completo e dá 404 na plataforma correspondente.
 - **`generate_context!` precisa de `serde_json` no crate** assim que existe um bloco
   `plugins` no `tauri.conf.json`. Sem a dependência o build quebra com um erro que não
   menciona plugin nenhum.

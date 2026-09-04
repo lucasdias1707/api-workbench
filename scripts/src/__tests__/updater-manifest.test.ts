@@ -1,30 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildManifest,
-  downloadUrl,
   platformFor,
   REQUIRED_PLATFORMS,
-  type SignedBundle,
+  type ReleaseAsset,
 } from '../updater-manifest.js';
 
 const REPO = 'https://github.com/lucasdias1707/carom-client-api';
+const download = (name: string) => `${REPO}/releases/download/v0.3.0/${name}`;
 
 /**
- * The four bundles a release carries.
- *
- * The macOS and Linux names are the ones observed coming out of the bundler and
- * out of the v0.1.2 release, not invented: macOS drops the version from the
- * tarball name, and Linux ships the AppImage itself rather than an archive of
- * one.
+ * The bundles a release carries, with the names observed coming out of CI:
+ * macOS drops the version from the tarball name, and Linux ships the AppImage
+ * itself — the `.AppImage.tar.gz` the bundler also writes never reaches the
+ * release.
  */
-function completeBundles(): SignedBundle[] {
+function releaseAssets(): ReleaseAsset[] {
   return [
-    { assetName: 'Carom_aarch64.app.tar.gz', signature: 'sig-mac-arm' },
-    { assetName: 'Carom_x64.app.tar.gz', signature: 'sig-mac-intel' },
-    { assetName: 'Carom_0.3.0_amd64.AppImage', signature: 'sig-linux' },
-    { assetName: 'Carom_0.3.0_x64-setup.exe', signature: 'sig-windows' },
-  ];
+    'Carom_aarch64.app.tar.gz',
+    'Carom_x64.app.tar.gz',
+    'Carom_0.3.0_amd64.AppImage',
+    'Carom_0.3.0_x64-setup.exe',
+  ].map((name) => ({ name, url: download(name) }));
 }
+
+const signed = (names: string[]) => (name: string) =>
+  names.includes(name) ? `sig-for-${name}\n` : undefined;
+
+const allSigned = (assets: ReleaseAsset[]) => signed(assets.map((asset) => asset.name));
 
 describe('platformFor', () => {
   it('maps each updater bundle to the key the plugin looks up', () => {
@@ -41,12 +44,8 @@ describe('platformFor', () => {
   });
 
   it('ignores the formats the updater cannot apply', () => {
-    // .dmg is how a person installs by hand; the updater swaps the .app inside
-    // the tarball. Tauri signs .deb and .rpm too, but they belong to the
-    // package manager and handing one to the updater would strand the install.
     for (const name of [
       'Carom_0.3.0_aarch64.dmg',
-      'Carom_0.3.0_x64.dmg',
       'Carom_0.3.0_amd64.deb',
       'Carom-0.3.0-1.x86_64.rpm',
       'latest.json',
@@ -60,91 +59,104 @@ describe('platformFor', () => {
   });
 });
 
-describe('downloadUrl', () => {
-  it('points at the release asset for the tag', () => {
-    expect(downloadUrl(REPO, 'v0.3.0', 'Carom_aarch64.app.tar.gz')).toBe(
-      `${REPO}/releases/download/v0.3.0/Carom_aarch64.app.tar.gz`,
-    );
-  });
-
-  it('tolerates a trailing slash on the repository URL', () => {
-    expect(downloadUrl(`${REPO}/`, 'v0.3.0', 'a.app.tar.gz')).toBe(
-      `${REPO}/releases/download/v0.3.0/a.app.tar.gz`,
-    );
-  });
-
-  it('escapes a name that would otherwise break the URL', () => {
-    expect(downloadUrl(REPO, 'v0.3.0', 'Carom x64.app.tar.gz')).toContain('Carom%20x64.app.tar.gz');
-  });
-});
-
 describe('buildManifest', () => {
-  const input = {
+  const base = {
     version: '0.3.0',
-    tag: 'v0.3.0',
-    repoUrl: REPO,
     notes: 'Fixes drag and drop.',
     now: new Date('2026-09-04T12:00:00.000Z'),
   };
 
-  it('lists all four platforms with their signatures and URLs', () => {
-    const manifest = buildManifest({ ...input, bundles: completeBundles() });
+  it('lists all four platforms, pointing at the release assets themselves', () => {
+    const assets = releaseAssets();
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
+
     expect(Object.keys(manifest.platforms).sort()).toEqual([...REQUIRED_PLATFORMS].sort());
     expect(manifest.platforms['darwin-aarch64']).toEqual({
-      signature: 'sig-mac-arm',
-      url: `${REPO}/releases/download/v0.3.0/Carom_aarch64.app.tar.gz`,
+      signature: 'sig-for-Carom_aarch64.app.tar.gz',
+      url: download('Carom_aarch64.app.tar.gz'),
     });
     expect(manifest.version).toBe('0.3.0');
-    expect(manifest.notes).toBe('Fixes drag and drop.');
     expect(manifest.pub_date).toBe('2026-09-04T12:00:00.000Z');
   });
 
   it('drops the dmg, deb and rpm that sit in the same release', () => {
-    // Tauri signs those too, so they arrive with a .sig alongside the rest.
-    const manifest = buildManifest({
-      ...input,
-      bundles: [
-        ...completeBundles(),
-        { assetName: 'Carom_0.3.0_aarch64.dmg', signature: 'ignored' },
-        { assetName: 'Carom_0.3.0_amd64.deb', signature: 'ignored' },
-        { assetName: 'Carom-0.3.0-1.x86_64.rpm', signature: 'ignored' },
-      ],
-    });
+    const assets = [
+      ...releaseAssets(),
+      { name: 'Carom_0.3.0_aarch64.dmg', url: download('Carom_0.3.0_aarch64.dmg') },
+      { name: 'Carom_0.3.0_amd64.deb', url: download('Carom_0.3.0_amd64.deb') },
+      { name: 'Carom-0.3.0-1.x86_64.rpm', url: download('Carom-0.3.0-1.x86_64.rpm') },
+    ];
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
     expect(Object.keys(manifest.platforms)).toHaveLength(4);
-    expect(manifest.platforms['linux-x86_64'].signature).toBe('sig-linux');
+  });
+
+  it('never treats a .sig as a bundle of its own', () => {
+    const assets = [
+      ...releaseAssets(),
+      { name: 'Carom_0.3.0_amd64.AppImage.sig', url: download('Carom_0.3.0_amd64.AppImage.sig') },
+    ];
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(releaseAssets()) });
+    expect(manifest.platforms['linux-x86_64'].url).toBe(download('Carom_0.3.0_amd64.AppImage'));
+  });
+
+  it('prefers the bare AppImage, which is the one the release actually serves', () => {
+    // The bundler writes a .AppImage.tar.gz too, but tauri-action does not
+    // upload it. Naming it here produced a manifest that 404s on Linux.
+    const assets = [
+      ...releaseAssets(),
+      {
+        name: 'Carom_0.3.0_amd64.AppImage.tar.gz',
+        url: download('Carom_0.3.0_amd64.AppImage.tar.gz'),
+      },
+    ];
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
+    expect(manifest.platforms['linux-x86_64'].url).toBe(download('Carom_0.3.0_amd64.AppImage'));
   });
 
   it('prefers the NSIS installer when Windows produced an MSI as well', () => {
-    // installMode: passive in tauri.conf.json configures the NSIS one.
-    const manifest = buildManifest({
-      ...input,
-      bundles: [...completeBundles(), { assetName: 'Carom_0.3.0_x64.msi', signature: 'sig-msi' }],
-    });
-    expect(manifest.platforms['windows-x86_64'].signature).toBe('sig-windows');
+    const assets = [
+      ...releaseAssets(),
+      { name: 'Carom_0.3.0_x64.msi', url: download('Carom_0.3.0_x64.msi') },
+    ];
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
+    expect(manifest.platforms['windows-x86_64'].url).toBe(download('Carom_0.3.0_x64-setup.exe'));
   });
 
-  it('picks the same winner regardless of the order the files were found in', () => {
-    const bundles = [{ assetName: 'Carom_0.3.0_x64.msi', signature: 'sig-msi' }, ...completeBundles()];
-    const manifest = buildManifest({ ...input, bundles });
-    expect(manifest.platforms['windows-x86_64'].signature).toBe('sig-windows');
+  it('picks the same winner regardless of the order the assets came back in', () => {
+    const assets = [
+      { name: 'Carom_0.3.0_x64.msi', url: download('Carom_0.3.0_x64.msi') },
+      ...releaseAssets(),
+    ];
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
+    expect(manifest.platforms['windows-x86_64'].url).toBe(download('Carom_0.3.0_x64-setup.exe'));
   });
 
   it('refuses to emit a manifest missing a platform, naming which', () => {
-    // A three-platform manifest looks, to the fourth platform's users, exactly
-    // like having no update at all — it has to be loud.
-    const bundles = completeBundles().filter((b) => !b.assetName.includes('setup.exe'));
-    expect(() => buildManifest({ ...input, bundles })).toThrow(/windows-x86_64/);
+    const assets = releaseAssets().filter((asset) => !asset.name.includes('setup.exe'));
+    expect(() => buildManifest({ ...base, assets, signatureFor: allSigned(assets) })).toThrow(
+      /windows-x86_64/,
+    );
   });
 
   it('names every missing platform, not just the first', () => {
-    expect(() => buildManifest({ ...input, bundles: [] })).toThrow(
+    expect(() => buildManifest({ ...base, assets: [], signatureFor: () => undefined })).toThrow(
       /darwin-aarch64.*darwin-x86_64.*linux-x86_64.*windows-x86_64/,
     );
   });
 
+  it('refuses an entry whose signature was never published', () => {
+    // The updater rejects what it cannot verify, so an unsigned entry is dead
+    // weight that looks alive.
+    const assets = releaseAssets();
+    const withoutLinux = assets.filter((a) => !a.name.endsWith('.AppImage')).map((a) => a.name);
+    expect(() => buildManifest({ ...base, assets, signatureFor: signed(withoutLinux) })).toThrow(
+      /Carom_0\.3\.0_amd64\.AppImage/,
+    );
+  });
+
   it('trims the trailing newline a .sig file carries', () => {
-    const bundles = completeBundles().map((bundle) => ({ ...bundle, signature: `${bundle.signature}\n` }));
-    const manifest = buildManifest({ ...input, bundles });
-    expect(manifest.platforms['linux-x86_64'].signature).toBe('sig-linux');
+    const assets = releaseAssets();
+    const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
+    expect(manifest.platforms['linux-x86_64'].signature).toBe('sig-for-Carom_0.3.0_amd64.AppImage');
   });
 });

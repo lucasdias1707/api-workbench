@@ -1,57 +1,86 @@
 /**
  * CLI wrapper around `buildManifest`, run by the desktop workflow after every
- * matrix job has finished.
+ * matrix job has published its bundles to the release.
  *
  * Usage:
- *   tsx src/compose-updater-manifest.ts <bundles-dir> <version> <repo-url> <out-file>
+ *   tsx src/compose-updater-manifest.ts <owner/repo> <version> <out-file>
  *
- * `bundles-dir` is where the four jobs' artifacts were downloaded. Every `.sig`
- * found under it is paired with the file it signs, which is the same path
- * without the suffix.
+ * Reads the release's own asset list, so every URL in the manifest is one the
+ * release actually serves. Tauri uploads each bundle's `.sig` alongside it, so
+ * the signatures come from there too.
  */
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
-import { buildManifest, platformFor, type SignedBundle } from './updater-manifest.js';
+import { writeFileSync } from 'node:fs';
+import { buildManifest, platformFor, type ReleaseAsset } from './updater-manifest.js';
 
-function findSignatures(root: string): string[] {
-  const found: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of readdirSync(dir)) {
-      const path = join(dir, entry);
-      if (statSync(path).isDirectory()) walk(path);
-      else if (entry.endsWith('.sig')) found.push(path);
-    }
+const API = 'https://api.github.com';
+
+type ApiAsset = { name: string; browser_download_url: string; url: string };
+
+function headers(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN;
+  return {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'carom-updater-manifest',
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
   };
-  walk(root);
-  return found;
 }
 
-function main(): void {
-  const [bundlesDir, version, repoUrl, outFile] = process.argv.slice(2);
-  if (!bundlesDir || !version || !repoUrl || !outFile) {
-    throw new Error('Usage: compose-updater-manifest <bundles-dir> <version> <repo-url> <out-file>');
+async function fetchRelease(repo: string, tag: string): Promise<{ assets: ApiAsset[]; body: string }> {
+  const response = await fetch(`${API}/repos/${repo}/releases/tags/${tag}`, { headers: headers() });
+  if (!response.ok) {
+    throw new Error(`Could not read release ${tag}: HTTP ${response.status} ${await response.text()}`);
+  }
+  return (await response.json()) as { assets: ApiAsset[]; body: string };
+}
+
+/**
+ * A `.sig` is a short base64 blob. Fetching it through the API asset endpoint
+ * rather than the browser URL keeps it working if the repository is private.
+ */
+async function fetchSignature(asset: ApiAsset): Promise<string> {
+  const response = await fetch(asset.url, {
+    headers: { ...headers(), accept: 'application/octet-stream' },
+  });
+  if (!response.ok) throw new Error(`Could not read ${asset.name}: HTTP ${response.status}`);
+  return await response.text();
+}
+
+async function main(): Promise<void> {
+  const [repo, version, outFile] = process.argv.slice(2);
+  if (!repo || !version || !outFile) {
+    throw new Error('Usage: compose-updater-manifest <owner/repo> <version> <out-file>');
   }
 
-  const bundles: SignedBundle[] = [];
-  for (const sigPath of findSignatures(bundlesDir)) {
-    // The signature file is the bundle's name plus `.sig`.
-    const assetName = basename(sigPath).replace(/\.sig$/, '');
-    if (!platformFor(assetName)) continue;
-    bundles.push({ assetName, signature: readFileSync(sigPath, 'utf8') });
-  }
+  const tag = `v${version}`;
+  const release = await fetchRelease(repo, tag);
+  const assets: ReleaseAsset[] = release.assets.map((asset) => ({
+    name: asset.name,
+    url: asset.browser_download_url,
+  }));
 
-  console.log(`Signed updater bundles found: ${bundles.map((b) => b.assetName).join(', ') || 'none'}`);
+  const applicable = assets.filter((asset) => !asset.name.endsWith('.sig') && platformFor(asset.name));
+  console.log(`Release ${tag} carries ${assets.length} assets; the updater can apply:`);
+  for (const asset of applicable) console.log(`  ${asset.name} -> ${platformFor(asset.name)}`);
+
+  // Only the ones that end up in the manifest need their signature fetched, but
+  // the choice happens inside buildManifest, so collect them all up front.
+  const signatures = new Map<string, string>();
+  for (const asset of release.assets) {
+    if (!asset.name.endsWith('.sig')) continue;
+    const signs = asset.name.slice(0, -'.sig'.length);
+    if (!platformFor(signs)) continue;
+    signatures.set(signs, await fetchSignature(asset));
+  }
 
   const manifest = buildManifest({
     version,
-    tag: `v${version}`,
-    repoUrl,
-    notes: `Carom v${version}. See the release page for what changed.`,
-    bundles,
+    notes: release.body?.trim() || `Carom ${tag}.`,
+    assets,
+    signatureFor: (name) => signatures.get(name),
   });
 
   writeFileSync(outFile, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`Wrote ${outFile} covering ${Object.keys(manifest.platforms).join(', ')}`);
 }
 
-main();
+await main();

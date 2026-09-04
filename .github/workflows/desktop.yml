@@ -75,6 +75,25 @@ jobs:
       # Linux leaves macOS and Windows with a rollup that cannot load itself.
       - run: pnpm install --frozen-lockfile
 
+      # An update is only accepted if it is signed by the key whose public half
+      # is baked into the app. Publishing without one produces installers that
+      # can never update themselves, and the people who install them are stuck
+      # there -- so refuse the release rather than ship that.
+      - name: Require an updater signing key
+        if: github.ref_type == 'tag' || inputs.publish
+        env:
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          pubkey=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').plugins.updater.pubkey")
+          if [ "$pubkey" = "PUBKEY_NOT_SET" ] || [ -z "$pubkey" ]; then
+            echo "::error::plugins.updater.pubkey is still the placeholder. Generate a keypair with 'tauri signer generate' and set it."
+            exit 1
+          fi
+          if [ -z "$SIGNING_KEY" ]; then
+            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set, so no bundle would be signed."
+            exit 1
+          fi
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,6 +104,10 @@ jobs:
           # accept. Removing the prompt needs a paid Developer ID plus
           # notarization -- see the Desktop section of ARCHITECTURE.md.
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
+          # Signs the updater bundles. Unrelated to the Apple signature above:
+          # this one is the app proving to itself that an update came from us.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: artifacts/api-workbench
           args: --target ${{ matrix.target }}
@@ -149,3 +172,53 @@ jobs:
           path: artifacts/api-workbench/src-tauri/target/${{ matrix.target }}/release/bundle/**/*
           if-no-files-found: warn
           retention-days: 14
+
+  # tauri-action deletes and replaces any release asset of the same name, so the
+  # four matrix jobs each overwrite the previous one's latest.json and only the
+  # last platform survives. The app would then update on one platform and fail
+  # silently on the other three. Composing the manifest once, after every job,
+  # is the only way it describes all four.
+  updater-manifest:
+    needs: build
+    if: github.ref_type == 'tag' || inputs.publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Collect the signed bundles from every platform
+        uses: actions/download-artifact@v4
+        with:
+          pattern: carom-*
+          path: bundles
+
+      - name: Compose latest.json
+        id: compose
+        run: |
+          version=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          pnpm --filter @workspace/scripts exec tsx src/compose-updater-manifest.ts \
+            "$GITHUB_WORKSPACE/bundles" \
+            "$version" \
+            "${{ github.server_url }}/${{ github.repository }}" \
+            "$GITHUB_WORKSPACE/latest.json"
+          cat "$GITHUB_WORKSPACE/latest.json"
+
+      # Last write wins, and this is the last write.
+      - name: Attach it to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.compose.outputs.version }}
+          files: latest.json

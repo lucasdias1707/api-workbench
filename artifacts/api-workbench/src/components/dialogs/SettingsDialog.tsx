@@ -1,7 +1,9 @@
 import { useRef } from 'react';
-import { Download, Upload, Zap } from 'lucide-react';
+import { Download, Upload } from 'lucide-react';
+import { AppMark } from '@/components/common/AppMark';
 import { Dialog } from '@/components/common/Dialog';
 import { useToast } from '@/components/common/Toaster';
+import { UpdatesSection } from '@/components/dialogs/UpdatesSection';
 import { downloadJson } from '@/lib/download';
 import { isSubtreeExport } from '@/lib/export';
 import { isDesktop } from '@/lib/http';
@@ -200,6 +202,8 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
           </p>
         </div>
 
+        {isDesktop() ? <UpdatesSection /> : null}
+
         <div>
           <div className="section-label">Workspace data</div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -240,7 +244,7 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
 
         <div className="about-line">
           <span className="brand-mark" style={{ width: 18, height: 18 }}>
-            <Zap size={11} strokeWidth={2.6} />
+            <AppMark size={11} />
           </span>
           <strong>Carom</strong>
           <span className="mono">{APP_VERSION}</span>

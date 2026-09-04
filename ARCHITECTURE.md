@@ -58,6 +58,8 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
+- `lib/updates.ts` — checagem, download e restart; único lugar que conhece o plugin do updater
+- `hooks/use-update-check.ts` — estados da checagem; checa no mount, nunca baixa sozinho
 - `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição
 - `lib/json-lexer.ts` — tokeniza JSON incompleto para colorir enquanto se digita
 - `lib/editor-keys.ts` — Tab, auto-fechamento de `{ [ "` e envolver seleção, como funções puras
@@ -181,6 +183,40 @@ acontece. No Windows é igual; o backend GTK só reage a arrasto de arquivo, por
 não aparecia no Linux. Desligar devolve o arrasto para a página, e não se perde nada: o app
 não tem nenhum recurso que aceite arquivo solto na janela. Coberto por
 `src/__tests__/tauri-config.test.ts`, já que JSON não tem onde escrever o motivo.
+
+### Atualização automática
+
+O app checa as releases do GitHub ao abrir, avisa quando há versão nova, e baixa **só se a
+pessoa clicar**. A checagem é desligável em Settings; o download nunca é automático.
+
+**Assinatura é obrigatória, não opcional.** O updater verifica uma assinatura minisign antes
+de instalar qualquer coisa. Existe uma chave privada que assina toda release (secrets
+`TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) e a pública fica embutida
+em `tauri.conf.json`. **Perder a privada trava todo mundo**: nenhum app instalado aceita
+update de outra chave, e a saída seria reinstalação manual em toda a base. Gerar com
+`pnpm --filter @workspace/api-workbench exec tauri signer generate -w <arquivo>`.
+
+Três armadilhas que já custaram tempo aqui:
+
+- **`bundle.createUpdaterArtifacts` vem desligado.** Sem ele a release sai com instaladores e
+  **nenhum** artefato de update, e todo app checando encontra nada. Coberto por
+  `src/__tests__/tauri-config.test.ts`.
+- **`tauri-action` apaga e substitui asset de mesmo nome.** Com quatro jobs de matriz
+  publicando na mesma release, cada um sobrescreve o `latest.json` do anterior e sobra uma
+  plataforma só — o update funcionaria em uma e falharia calado nas outras três. Por isso o
+  job `updater-manifest` roda **depois** da matriz e compõe o manifesto uma vez
+  (`scripts/src/updater-manifest.ts`), recusando-se a emitir manifesto parcial.
+- **`generate_context!` precisa de `serde_json` no crate** assim que existe um bloco
+  `plugins` no `tauri.conf.json`. Sem a dependência o build quebra com um erro que não
+  menciona plugin nenhum.
+
+**`.deb` e `.rpm` não se auto-atualizam** — os arquivos são do gerenciador de pacotes. O
+comando `install_kind` em `lib.rs` detecta isso (`$APPIMAGE` só existe dentro de um AppImage)
+e a UI troca o botão por um link para a release.
+
+O workflow recusa publicar enquanto a pubkey for o marcador `PUBKEY_NOT_SET` ou o secret
+estiver vazio: uma release com chave placeholder prende quem instalar numa chave que não
+existe.
 
 ### Assinatura (macOS e Windows)
 

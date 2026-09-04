@@ -26,9 +26,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/lucasdias1707/api-workbench/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      },
+      "pubkey": "PUBKEY_NOT_SET"
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,7 +49,7 @@
       "icons/icon.ico"
     ],
     "category": "DeveloperTool",
-    "shortDescription": "Carom — HTTP client",
+    "shortDescription": "Carom \u2014 HTTP client",
     "longDescription": "Carom composes, organises and sends HTTP requests, with collections, environments and a readable response viewer."
   }
 }

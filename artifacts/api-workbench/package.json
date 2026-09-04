@@ -83,7 +83,9 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-http": "^2.6.0"
+    "@tauri-apps/plugin-http": "^2.6.0",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0"
   },
   "optionalDependencies": {
     "@rollup/rollup-darwin-arm64": "4.62.3",

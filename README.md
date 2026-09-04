@@ -77,6 +77,29 @@ problema — **baixe a release mais recente**, que já sai assinada ad-hoc pelo 
 
 ---
 
+## Atualização
+
+A partir da `v0.3.0` o Carom se atualiza sozinho. Ao abrir, ele consulta as releases deste
+repositório; se houver versão nova, aparece um aviso em **Settings → Updates** com as notas
+da versão e um botão **Download and install**. O download só acontece se você clicar —
+nunca sozinho. Terminando, é um clique em **Restart now** e pronto.
+
+A checagem automática pode ser desligada no mesmo lugar; aí o update só acontece quando você
+clicar em **Check now**.
+
+Dois detalhes:
+
+- **A primeira versão com updater ainda é instalação manual.** Quem está na `v0.1.x` ou
+  `v0.2.0` precisa baixar uma vez à mão; o automático vale da seguinte em diante.
+- **`.deb` e `.rpm` não se atualizam sozinhos.** Esses arquivos pertencem ao gerenciador de
+  pacotes da distro, e o app sobrescrevê-los deixaria o sistema com um registro errado do que
+  está instalado. Nesse caso o Carom detecta a situação, avisa que há versão nova e manda
+  para a página da release. O `.AppImage` se atualiza normalmente.
+
+No macOS há um efeito colateral bem-vindo: a quarentena é carimbada pelo **navegador**, e um
+arquivo baixado pelo próprio app não recebe carimbo nenhum. Ou seja, o aviso do Gatekeeper
+aparece só na primeira instalação manual — as atualizações seguintes abrem direto.
+
 ## Windows: liberar o app no primeiro uso
 
 O SmartScreen mostra *"O Windows protegeu seu PC"* pelo mesmo motivo — o instalador não é
@@ -144,8 +167,15 @@ Detalhes de arquitetura, variáveis de ambiente e decisões de projeto estão em
 
 ## Publicar uma versão
 
-Instaladores só são publicados a partir de uma tag. Bumpe a versão em
-`artifacts/api-workbench/src-tauri/tauri.conf.json` (e em `Cargo.toml` + `Cargo.lock`), então:
+Instaladores só são publicados a partir de uma tag, e **só com a chave de assinatura do
+updater configurada** — o workflow recusa publicar sem ela, porque instaladores não assinados
+nunca conseguiriam se atualizar. São dois secrets no repositório
+(`TAURI_SIGNING_PRIVATE_KEY` e `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`) mais a chave pública em
+`tauri.conf.json`; veja a seção de atualização automática em
+[`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+Bumpe a versão em `artifacts/api-workbench/src-tauri/tauri.conf.json` (e em `Cargo.toml` +
+`Cargo.lock`), então:
 
 - **Pelo GitHub:** Actions → *Desktop build* → *Run workflow*, branch `main`, marcando
   **"Publish installers to a release"**. A tag sai da versão do `tauri.conf.json`.

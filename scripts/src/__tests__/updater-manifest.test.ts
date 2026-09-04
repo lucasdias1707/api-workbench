@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fetchRelease } from '../compose-updater-manifest.js';
 import {
   buildManifest,
   platformFor,
@@ -158,5 +159,54 @@ describe('buildManifest', () => {
     const assets = releaseAssets();
     const manifest = buildManifest({ ...base, assets, signatureFor: allSigned(assets) });
     expect(manifest.platforms['linux-x86_64'].signature).toBe('sig-for-Carom_0.3.0_amd64.AppImage');
+  });
+});
+
+describe('finding the release, draft included', () => {
+  const asRelease = (tag: string, draft: boolean) => ({
+    tag_name: tag,
+    draft,
+    body: 'notes',
+    assets: [],
+  });
+
+  const respond = (status: number, body: unknown) =>
+    ({ ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) }) as Response;
+
+  it('uses the tag endpoint when the release is already published', async () => {
+    const calls: string[] = [];
+    const send = (async (url: string | URL | Request) => {
+      calls.push(String(url));
+      return respond(200, asRelease('v1.0.0', false));
+    }) as unknown as typeof fetch;
+
+    const release = await fetchRelease('owner/repo', 'v1.0.0', send);
+    expect(release.tag_name).toBe('v1.0.0');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('/releases/tags/v1.0.0');
+  });
+
+  it('falls back to the listing for a draft, which has no tag yet', async () => {
+    // A draft release is what the build produces until the manifest is
+    // attached, and GitHub creates its tag only when it is published — so
+    // `releases/tags/...` answers 404 for exactly the release we need.
+    const send = (async (url: string | URL | Request) => {
+      if (String(url).includes('/releases/tags/')) return respond(404, { message: 'Not Found' });
+      return respond(200, [asRelease('v0.9.0', false), asRelease('v1.0.0', true)]);
+    }) as unknown as typeof fetch;
+
+    const release = await fetchRelease('owner/repo', 'v1.0.0', send);
+    expect(release).toMatchObject({ tag_name: 'v1.0.0', draft: true });
+  });
+
+  it('reports a genuine API failure rather than falling back to the listing', async () => {
+    const send = (async () => respond(500, { message: 'boom' })) as unknown as typeof fetch;
+    await expect(fetchRelease('owner/repo', 'v1.0.0', send)).rejects.toThrow(/HTTP 500/);
+  });
+
+  it('says plainly when no release exists for the tag at all', async () => {
+    const send = (async (url: string | URL | Request) =>
+      String(url).includes('/releases/tags/') ? respond(404, {}) : respond(200, [])) as unknown as typeof fetch;
+    await expect(fetchRelease('owner/repo', 'v1.0.0', send)).rejects.toThrow(/No release found for v1.0.0/);
   });
 });

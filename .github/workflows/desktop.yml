@@ -108,19 +108,27 @@ jobs:
 
             ### First run on macOS
 
-            The bundles are signed ad-hoc, not with a paid Apple Developer ID,
-            so Gatekeeper does not recognise the publisher. Open the `.dmg`,
-            drag Kavo to Applications, then either right-click the app and
-            choose **Open** (once), or run:
+            macOS says it "could not verify Kavo is free of malware". The
+            bundles are signed ad-hoc, not with a paid Apple Developer ID, so
+            Gatekeeper cannot attest to the publisher. Drag Kavo to
+            Applications, then either run:
 
             ```sh
             xattr -cr /Applications/Kavo.app
             ```
 
+            or click **OK** on the warning and go to **System Settings ->
+            Privacy & Security**, scroll to the bottom and press **Open
+            Anyway**. Right-click -> Open no longer works for this on recent
+            macOS. Once is enough either way.
+
             ### First run on Windows
 
             SmartScreen shows "Windows protected your PC" for the same reason:
             choose **More info -> Run anyway**.
+
+            Full instructions, and what it would take to remove the prompts,
+            are in the [README](https://github.com/lucasdias1707/api-workbench#readme).
           releaseDraft: false
           prerelease: false
 

@@ -84,6 +84,21 @@ export type PostmanImport = {
   requests: RequestRecord[];
   /** Present only for an environment file. */
   environment: Environment | null;
+  /**
+   * Variables the collection and its folders declared, for the **base**
+   * environment rather than for the folder they came from.
+   *
+   * Postman resolves environment variables *before* collection ones; this app
+   * resolves folder variables *before* environments. Mapping Postman's
+   * collection variables onto a folder therefore inverts their priority, and
+   * an imported collection stops working exactly where it used to: a token
+   * left blank at collection level shadows the real one in the selected
+   * environment, and every request 401s.
+   *
+   * The base environment is the one scope here that sits *below* the selected
+   * environment, so it is where they belong.
+   */
+  variables: KeyValue[];
 };
 
 function text(value: unknown): string {
@@ -263,6 +278,7 @@ export function importPostman(payload: unknown, workspaceId: string, startIndex 
       folders: [],
       requests: [],
       environment: createEnvironment(workspaceId, name, false, toRows(payload.values)),
+      variables: [],
     };
   }
 
@@ -274,8 +290,23 @@ export function importPostman(payload: unknown, workspaceId: string, startIndex 
   const requests: RequestRecord[] = [];
   const name = text(payload.info?.name) || 'Imported collection';
 
+  // Collected as we walk, and handed to the base environment by the caller.
+  const variables: KeyValue[] = [];
+  const seenVariable = new Set<string>();
+  const takeVariables = (values: PostmanValue[] | undefined) => {
+    for (const item of toRows(values)) {
+      const key = item.key.trim();
+      // First definition wins. Postman scopes folder variables to their folder
+      // and these are being flattened, so a name used twice has to pick one;
+      // the outermost is the one the collection as a whole meant.
+      if (!key || seenVariable.has(key)) continue;
+      seenVariable.add(key);
+      variables.push(item);
+    }
+  };
+
   const rootFolder = createFolder(workspaceId, name, null, startIndex + folders.length);
-  rootFolder.variables = toRows(payload.variable);
+  takeVariables(payload.variable);
   rootFolder.auth = toAuth(payload.auth);
   rootFolder.preScript = toScript(payload.event, 'prerequest');
   rootFolder.postScript = toScript(payload.event, 'test');
@@ -290,7 +321,7 @@ export function importPostman(payload: unknown, workspaceId: string, startIndex 
           parentId,
           startIndex + folders.length,
         );
-        folder.variables = toRows(item.variable);
+        takeVariables(item.variable);
         folder.auth = toAuth(item.auth);
         folder.preScript = toScript(item.event, 'prerequest');
         folder.postScript = toScript(item.event, 'test');
@@ -327,7 +358,7 @@ export function importPostman(payload: unknown, workspaceId: string, startIndex 
 
   walk(payload.item ?? [], rootFolder.id);
 
-  return { name, folders, requests, environment: null };
+  return { name, folders, requests, environment: null, variables };
 }
 
 /** Parse the file text, with a message worth reading when it is not JSON. */

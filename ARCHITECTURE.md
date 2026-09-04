@@ -138,6 +138,13 @@ barra de menu do macOS e a bandeja do Windows pedem.
 - **O botão de update só existe quando há o que fazer.** Nada de ícone permanentemente morto
   na barra: é ele o único controle colorido lá em cima, então a cor sozinha já chama atenção.
   Um erro de checagem não vira badge — ele aparece em Settings, onde dá para agir.
+- **As variáveis de uma coleção do Postman vão para o ambiente base, não para a pasta.**
+  O Postman resolve `Environment` **antes** de `Collection`; aqui a pasta vem **antes** do
+  ambiente. Mapear variável de coleção para pasta inverte a prioridade, e uma coleção que
+  funcionava lá para de funcionar aqui: um `token` em branco no nível da coleção sombreia o
+  real do ambiente selecionado e todo request volta 401. O base é o único escopo que fica
+  *abaixo* do ambiente selecionado, então é onde elas pertencem. Nome que o base já define
+  não é sobrescrito — o valor local foi escolhido por alguém, o da coleção é um padrão.
 - **Importar não é tudo ou nada.** A árvore da coleção vem com checkbox por linha. Marcar uma
   pasta leva tudo abaixo dela; desmarcar uma request dentro de uma pasta marcada deixa o
   resto — é para isso que serve um checkbox por linha. Uma pasta desmarcada ainda vem junto

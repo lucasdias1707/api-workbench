@@ -305,12 +305,26 @@ export function reducer(state: WorkspaceState, action: Action): WorkspaceState {
       const destination = action.workspaceId ?? action.workspace?.id ?? state.activeWorkspaceId;
       const moving = destination !== state.activeWorkspaceId;
 
+      // An imported collection's own variables go into the destination's base
+      // environment, and never overwrite a name it already defines: the local
+      // value is the one someone chose, and the collection's is a default.
+      const withBaseVariables = (environments: Environment[]): Environment[] => {
+        const incoming = action.baseVariables ?? [];
+        if (incoming.length === 0) return environments;
+        return environments.map((environment) => {
+          if (!environment.isBase || environment.workspaceId !== destination) return environment;
+          const defined = new Set(environment.variables.map((item) => item.key.trim()).filter(Boolean));
+          const fresh = incoming.filter((item) => !defined.has(item.key.trim()));
+          return fresh.length === 0 ? environment : { ...environment, variables: [...environment.variables, ...fresh] };
+        });
+      };
+
       const next: WorkspaceState = {
         ...state,
         workspaces: action.workspace ? [...state.workspaces, action.workspace] : state.workspaces,
         folders: [...state.folders, ...action.folders],
         requests: [...state.requests, ...action.requests],
-        environments: [...state.environments, ...added],
+        environments: withBaseVariables([...state.environments, ...added]),
         activeWorkspaceId: destination,
         // Tabs belong to the workspace they were opened from, so importing
         // somewhere else leaves them behind rather than dragging them along.

@@ -386,6 +386,54 @@ describe('importing a tree', () => {
     expect(next.activeWorkspaceId).toBe(opened.activeWorkspaceId);
   });
 
+  it("puts an imported collection's variables into the destination's base environment", () => {
+    const state = seed();
+    const next = reducer(state, {
+      type: 'import/merge',
+      folders: [],
+      requests: [],
+      environment: null,
+      baseVariables: [row('collectionOnly', 'from-postman')],
+    });
+    const base = next.environments.find((item) => item.isBase && item.workspaceId === state.activeWorkspaceId)!;
+    expect(base.variables.some((item) => item.key === 'collectionOnly')).toBe(true);
+  });
+
+  it('never overwrites a base variable the workspace already defines', () => {
+    // The local value is the one someone chose; the collection's is a default.
+    const state = seed();
+    const base = state.environments.find((item) => item.isBase)!;
+    const existing = base.variables.find((item) => item.key === 'baseUrl')!;
+
+    const next = reducer(state, {
+      type: 'import/merge',
+      folders: [],
+      requests: [],
+      environment: null,
+      baseVariables: [row('baseUrl', 'https://from-the-collection.test')],
+    });
+    const after = next.environments.find((item) => item.id === base.id)!;
+    expect(after.variables.filter((item) => item.key === 'baseUrl')).toHaveLength(1);
+    expect(after.variables.find((item) => item.key === 'baseUrl')?.value).toBe(existing.value);
+  });
+
+  it('fills the base environment of a workspace the import created', () => {
+    const workspace = createWorkspace('Imported');
+    const baseEnvironment = createEnvironment(workspace.id, 'Base', true, []);
+    const next = reducer(seed(), {
+      type: 'import/merge',
+      folders: [createFolder(workspace.id, 'Acme API', null, 0)],
+      requests: [],
+      environment: null,
+      workspace,
+      baseEnvironment,
+      baseVariables: [row('token', 'abc')],
+      workspaceId: workspace.id,
+    });
+    const base = next.environments.find((item) => item.id === baseEnvironment.id)!;
+    expect(base.variables.map((item) => item.key)).toEqual(['token']);
+  });
+
   it('changes nothing about the view when only an environment came in', () => {
     const state = reducer(seed(), { type: 'request/open', id: seed().requests[0].id });
     const environment = createEnvironment(state.activeWorkspaceId, 'Staging', false, []);

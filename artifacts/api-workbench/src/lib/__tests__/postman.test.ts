@@ -126,11 +126,10 @@ describe('importPostman', () => {
     expect(() => importOf({ hello: 'world' })).toThrow(/not a Postman collection/);
   });
 
-  it('makes the collection itself a folder, so its variables have somewhere to live', () => {
+  it('makes the collection itself a folder, so its auth and scripts have somewhere to live', () => {
     const result = importOf(collection({ variable: [{ key: 'baseUrl', value: 'https://api.test' }] }));
     expect(result.folders).toHaveLength(1);
     expect(result.folders[0]).toMatchObject({ name: 'My API', parentId: null });
-    expect(result.folders[0].variables[0]).toMatchObject({ key: 'baseUrl', value: 'https://api.test' });
   });
 
   it('nests folders the way the collection nests them', () => {
@@ -323,6 +322,62 @@ describe('choosing what to import', () => {
 
   it('takes nothing when nothing is ticked', () => {
     expect(pruneImport(nested(), new Set())).toEqual({ folders: [], requests: [] });
+  });
+});
+
+describe("where a collection's own variables land", () => {
+  /**
+   * Postman resolves an environment variable *before* a collection one; this
+   * app resolves a folder variable *before* an environment. Putting Postman's
+   * collection variables on the imported folder therefore inverts their
+   * priority — a blank `token` at collection level shadows the real one in the
+   * selected environment, and every request comes back 401 despite working in
+   * Postman. They belong in the base environment, which is the one scope that
+   * sits below the selected environment.
+   */
+  it('keeps them off the folder, where they would outrank the environment', () => {
+    const result = importOf(collection({ variable: [{ key: 'token', value: '' }] }));
+    expect(result.folders[0].variables).toEqual([]);
+  });
+
+  it('hands them over for the base environment instead', () => {
+    const result = importOf(collection({ variable: [{ key: 'baseUrl', value: 'https://api.test' }] }));
+    expect(result.variables).toHaveLength(1);
+    expect(result.variables[0]).toMatchObject({ key: 'baseUrl', value: 'https://api.test', enabled: true });
+  });
+
+  it('takes the variables of nested folders too, outermost first', () => {
+    const result = importOf(
+      collection({
+        variable: [{ key: 'a', value: 'collection' }],
+        item: [{ name: 'Users', item: [], variable: [{ key: 'b', value: 'folder' }] }],
+      }),
+    );
+    expect(result.variables.map((item) => item.key)).toEqual(['a', 'b']);
+    expect(result.folders.every((folder) => folder.variables.length === 0)).toBe(true);
+  });
+
+  it('keeps the first definition when a name is declared twice', () => {
+    // Postman scopes folder variables to their folder; flattening them has to
+    // pick one, and the outermost is what the collection as a whole meant.
+    const result = importOf(
+      collection({
+        variable: [{ key: 'host', value: 'outer' }],
+        item: [{ name: 'Inner', item: [], variable: [{ key: 'host', value: 'inner' }] }],
+      }),
+    );
+    expect(result.variables).toHaveLength(1);
+    expect(result.variables[0].value).toBe('outer');
+  });
+
+  it('carries a disabled collection variable across as unticked', () => {
+    const result = importOf(collection({ variable: [{ key: 'debug', value: '1', disabled: true }] }));
+    expect(result.variables[0]).toMatchObject({ key: 'debug', enabled: false });
+  });
+
+  it('reports none for an environment file, which has no collection scope', () => {
+    const result = importOf({ name: 'Staging', values: [{ key: 'a', value: '1' }], _postman_variable_scope: 'environment' });
+    expect(result.variables).toEqual([]);
   });
 });
 

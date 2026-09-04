@@ -70,15 +70,17 @@ describe('describeUpdateBadge', () => {
   });
 
   it('shows nothing when a check failed', () => {
-    // The failure is reported in Settings, where it can be acted on; a badge
-    // would promise a download that does not exist.
+    // Reported in Settings, where it can be acted on; a badge would promise a
+    // download that does not exist.
     expect(describeUpdateBadge('error', null, nothing)).toBeNull();
+    expect(describeUpdateBadge('error', version, nothing)).toBeNull();
   });
 
-  it('announces a version that is waiting, and says what clicking does', () => {
+  it('announces a version that is waiting, and downloads on click', () => {
     expect(describeUpdateBadge('available', version, nothing)).toEqual({
       tone: 'available',
-      label: 'Version 0.4.0 is available — click to download it',
+      action: 'download',
+      label: 'Version 0.4.0 is available — click to download and install it',
     });
   });
 
@@ -86,20 +88,68 @@ describe('describeUpdateBadge', () => {
     expect(describeUpdateBadge('available', null, nothing)).toBeNull();
   });
 
-  it('reports progress while downloading', () => {
+  it('reports progress while downloading, and cannot be clicked', () => {
     const badge = describeUpdateBadge('downloading', version, { received: 512, total: 1024 });
     expect(badge?.tone).toBe('busy');
+    expect(badge?.action).toBe('none');
     expect(badge?.label).toContain('50%');
   });
 
-  it('asks for a restart once the update is in place', () => {
+  it('restarts on click once the update is in place', () => {
     expect(describeUpdateBadge('ready', version, nothing)).toEqual({
       tone: 'ready',
-      label: 'Version 0.4.0 is installed — restart to finish',
+      action: 'restart',
+      label: 'Version 0.4.0 is installed — click to restart and finish',
     });
   });
 
   it('still asks for a restart if the version was somehow lost', () => {
-    expect(describeUpdateBadge('ready', null, nothing)?.tone).toBe('ready');
+    expect(describeUpdateBadge('ready', null, nothing)?.action).toBe('restart');
+  });
+
+  describe('when a download fails', () => {
+    /**
+     * The badge is the thing that started the download, so it is the thing
+     * that has to report the failure. Before it did the work itself this could
+     * stay silent — now, staying silent would mean the button vanishes a
+     * moment after being pressed.
+     */
+    const failed = { downloadError: 'The download did not finish. Network unreachable.' };
+
+    it('stays put, in red, and offers another go', () => {
+      expect(describeUpdateBadge('error', version, nothing, failed)).toEqual({
+        tone: 'failed',
+        action: 'download',
+        label: 'The download did not finish. Network unreachable. Click to try again.',
+      });
+    });
+
+    it('sends a package install to the release page instead of retrying', () => {
+      expect(describeUpdateBadge('error', version, nothing, { ...failed, selfUpdating: false })?.action).toBe(
+        'release-page',
+      );
+    });
+  });
+
+  describe('on an install that cannot replace its own files', () => {
+    /**
+     * A `.deb` or `.rpm` belongs to the package manager. Starting a download
+     * the installer would refuse is worse than sending someone somewhere they
+     * can act, so that one case is a link.
+     */
+    it('links to the release page rather than downloading', () => {
+      const badge = describeUpdateBadge('available', version, nothing, { selfUpdating: false });
+      expect(badge?.action).toBe('release-page');
+      expect(badge?.tone).toBe('available');
+    });
+
+    it('says why, since the button does something different from what it looks like', () => {
+      const badge = describeUpdateBadge('available', version, nothing, { selfUpdating: false });
+      expect(badge?.label).toContain('package manager');
+    });
+
+    it('still restarts normally once something else installed the update', () => {
+      expect(describeUpdateBadge('ready', version, nothing, { selfUpdating: false })?.action).toBe('restart');
+    });
   });
 });

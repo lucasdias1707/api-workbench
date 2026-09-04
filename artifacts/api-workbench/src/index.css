@@ -1237,6 +1237,13 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
 .update-badge.ready { color: var(--green); }
 .update-badge.ready:hover:not(:disabled) { background: color-mix(in srgb, var(--green) 16%, transparent); }
 .update-badge.busy { color: var(--text-dim); }
+.update-badge.failed { color: var(--red); }
+.update-badge.failed:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 16%, transparent); }
+.update-badge.failed:hover .update-dot { box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 16%, var(--bg-sidebar)); }
+/* The busy state is not clickable; it should not look like it is. */
+.update-badge:disabled { opacity: 1; cursor: default; }
+/* An <a> does not inherit the button reset the rest of the bar uses. */
+a.update-badge { text-decoration: none; }
 .update-badge.busy svg { animation: update-pulse 1.4s ease-in-out infinite; }
 
 /* The dot sits where a count would, but there is only ever one update.

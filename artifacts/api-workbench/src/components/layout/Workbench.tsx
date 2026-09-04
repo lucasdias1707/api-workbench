@@ -161,7 +161,7 @@ export function Workbench() {
             >
               {state.settings.layout === 'horizontal' ? <Rows2 size={15} /> : <Columns2 size={15} />}
             </button>
-            <UpdateBadge onOpenSettings={() => setOverlay('settings')} />
+            <UpdateBadge />
             <button
               className="icon-btn"
               onClick={() => setOverlay('settings')}

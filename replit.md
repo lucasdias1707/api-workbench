@@ -3,6 +3,10 @@
 Um cliente HTTP no estilo desktop — inspirado no Yaak — para compor, organizar e enviar
 requisições com foco em teclado, tema escuro e leitura clara da resposta.
 
+Este arquivo é a documentação interna (arquitetura e operação). O `README.md` é a porta de
+entrada de quem só quer baixar e usar — inclusive o passo a passo de liberar o app no
+Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
+
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — sobe o servidor de apoio (porta 8080, ver `artifact.toml`)
@@ -148,9 +152,11 @@ publisher. No macOS o build usa **assinatura ad-hoc** (`APPLE_SIGNING_IDENTITY: 
 workflow) — isso não é cosmético: em Apple Silicon um `.app` arm64 *sem assinatura nenhuma*
 é rejeitado pelo Gatekeeper com a mensagem "está danificado e não pode ser aberto", que
 parece corrupção de download mas é falha de validação. Com ad-hoc a assinatura é válida e o
-primeiro run vira o aviso normal de "desenvolvedor não identificado", que dá para aceitar
-(botão direito → Abrir, ou `xattr -cr /Applications/Kavo.app`). O step `Verify macOS
-signature` roda `codesign -dv` e `codesign --verify` no bundle e deixa a prova no log.
+primeiro run vira o aviso de que a Apple não conseguiu verificar o app, que dá para aceitar
+(`xattr -cr /Applications/Kavo.app`, ou Ajustes do Sistema → Privacidade e Segurança →
+Abrir Mesmo Assim; botão direito → Abrir não vale mais no macOS recente). O passo a passo
+para quem instala está no README. O step `Verify macOS signature` roda `codesign -dv` e
+`codesign --verify` no bundle e deixa a prova no log.
 
 Para tirar o aviso de vez é preciso Apple Developer ID pago + notarização: `tauri-action`
 aceita `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`,

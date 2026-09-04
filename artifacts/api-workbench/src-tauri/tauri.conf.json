@@ -34,7 +34,7 @@
       "windows": {
         "installMode": "passive"
       },
-      "pubkey": "PUBKEY_NOT_SET"
+      "pubkey": ""
     }
   },
   "bundle": {

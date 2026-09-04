@@ -214,9 +214,19 @@ Três armadilhas que já custaram tempo aqui:
 comando `install_kind` em `lib.rs` detecta isso (`$APPIMAGE` só existe dentro de um AppImage)
 e a UI troca o botão por um link para a release.
 
-O workflow recusa publicar enquanto a pubkey for o marcador `PUBKEY_NOT_SET` ou o secret
-estiver vazio: uma release com chave placeholder prende quem instalar numa chave que não
-existe.
+**`createUpdaterArtifacts: true` exige chave privada e derruba o build inteiro sem ela** —
+publicando ou não, e independentemente de a pubkey estar preenchida ou vazia (verificado nos
+dois casos). Por isso o passo `Set up updater signing`, quando não há chave, escreve um
+`--config` desligando o flag só naquela run. O config versionado mantém o flag ligado, que é
+o estado que uma release precisa.
+
+A chave privada é exportada nesse mesmo passo, para o `$GITHUB_ENV`, e **só quando tem
+valor**: secret inexistente no Actions vira string vazia, não variável ausente, e o Tauri lê
+"definida mas vazia" como "assine com esta chave" e falha ao decodificá-la. Foi assim que a
+primeira tentativa quebrou.
+
+O workflow recusa publicar enquanto a pubkey estiver vazia ou o secret não existir: um app
+publicado sem chave pública nunca consegue verificar — e portanto aplicar — um update.
 
 ### Assinatura (macOS e Windows)
 

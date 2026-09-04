@@ -79,20 +79,51 @@ jobs:
       # is baked into the app. Publishing without one produces installers that
       # can never update themselves, and the people who install them are stuck
       # there -- so refuse the release rather than ship that.
-      - name: Require an updater signing key
-        if: github.ref_type == 'tag' || inputs.publish
+      #
+      # The key is exported here rather than in the build step's `env:` because
+      # an unset secret is an empty string, not an absent variable, and Tauri
+      # reads "set but empty" as "sign with this key" and fails to decode it.
+      # Every build broke that way before this step existed.
+      - name: Set up updater signing
         env:
           SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          PUBLISHING: ${{ (github.ref_type == 'tag' || inputs.publish) && 'yes' || 'no' }}
         run: |
           pubkey=$(node -p "require('./artifacts/api-workbench/src-tauri/tauri.conf.json').plugins.updater.pubkey")
-          if [ "$pubkey" = "PUBKEY_NOT_SET" ] || [ -z "$pubkey" ]; then
-            echo "::error::plugins.updater.pubkey is still the placeholder. Generate a keypair with 'tauri signer generate' and set it."
-            exit 1
+
+          if [ "$PUBLISHING" = "yes" ]; then
+            if [ -z "$pubkey" ]; then
+              echo "::error::plugins.updater.pubkey is empty. Generate a keypair with 'tauri signer generate' and put the public half there."
+              exit 1
+            fi
+            if [ -z "$SIGNING_KEY" ]; then
+              echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set, so nothing would be signed and no app could apply the update."
+              exit 1
+            fi
           fi
+
           if [ -z "$SIGNING_KEY" ]; then
-            echo "::error::The TAURI_SIGNING_PRIVATE_KEY secret is not set, so no bundle would be signed."
-            exit 1
+            # createUpdaterArtifacts refuses to run without a private key, and
+            # that failure is fatal to the whole build -- so with no key, turn
+            # the artifacts off for this run rather than leave every non-publish
+            # build red. The committed config keeps them on, which is the state
+            # a release needs.
+            echo '{"bundle":{"createUpdaterArtifacts":false}}' > "$RUNNER_TEMP/no-updater.json"
+            echo "TAURI_EXTRA_ARGS=--config $RUNNER_TEMP/no-updater.json" >> "$GITHUB_ENV"
+            echo "No signing key: updater artifacts disabled for this run."
+            exit 0
           fi
+
+          # Heredoc form: a minisign key is several lines.
+          {
+            echo "TAURI_SIGNING_PRIVATE_KEY<<TAURI_KEY_EOF"
+            echo "$SIGNING_KEY"
+            echo "TAURI_KEY_EOF"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD<<TAURI_PASSWORD_EOF"
+            echo "$SIGNING_PASSWORD"
+            echo "TAURI_PASSWORD_EOF"
+          } >> "$GITHUB_ENV"
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -104,13 +135,12 @@ jobs:
           # accept. Removing the prompt needs a paid Developer ID plus
           # notarization -- see the Desktop section of ARCHITECTURE.md.
           APPLE_SIGNING_IDENTITY: ${{ startsWith(matrix.platform, 'macos') && '-' || '' }}
-          # Signs the updater bundles. Unrelated to the Apple signature above:
-          # this one is the app proving to itself that an update came from us.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # TAURI_SIGNING_PRIVATE_KEY is not listed here on purpose: the step
+          # above exports it into the job environment, and only when it has a
+          # value. See the comment there.
         with:
           projectPath: artifacts/api-workbench
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ env.TAURI_EXTRA_ARGS }}
           # Empty on a manual run with `publish` off, which makes tauri-action
           # build without touching releases. Otherwise __VERSION__ comes from
           # tauri.conf.json, so the tag and the installers always agree.

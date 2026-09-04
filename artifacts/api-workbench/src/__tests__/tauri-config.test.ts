@@ -54,12 +54,12 @@ describe('updater configuration', () => {
     ]);
   });
 
-  it('has a public key of the right shape, or the placeholder the release guard rejects', () => {
-    // A real minisign public key is base64 and roughly this long. Accepting the
-    // placeholder keeps pull requests green; the workflow refuses to publish
-    // while it is still there.
+  it('has a public key of the right shape, or none at all', () => {
+    // Empty is the "no keypair yet" state. The workflow refuses to publish
+    // while it is empty, since an app shipped with no public key can never
+    // verify — and therefore never apply — an update.
     const { pubkey } = config.plugins.updater;
-    if (pubkey === 'PUBKEY_NOT_SET') return;
+    if (pubkey === '') return;
     expect(pubkey).toMatch(/^[A-Za-z0-9+/=]{40,}$/);
   });
 });

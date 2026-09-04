@@ -145,6 +145,18 @@ uma tag: uma tag `v*` enviada, ou uma run manual com `publish` marcado (a tag sa
 em `tauri.conf.json`). Run manual sem `publish` builda as quatro plataformas e deixa os
 bundles como artefatos da run.
 
+### Drag and drop
+
+`dragDropEnabled: false` na janela é obrigatório, não preferência. Ligado (o padrão), o
+Tauri instala um handler de drag do sistema operacional sobre a webview; no macOS esse
+handler intercepta **qualquer** arrasto, não só arquivos — a subclasse de WKWebView do wry
+sobrescreve `draggingEntered:` e `performDragOperation:` incondicionalmente e o handler do
+Tauri sempre responde "tratei", então nada chega ao conteúdo da página e o drop nunca
+acontece. No Windows é igual; o backend GTK só reage a arrasto de arquivo, por isso o bug
+não aparecia no Linux. Desligar devolve o arrasto para a página, e não se perde nada: o app
+não tem nenhum recurso que aceite arquivo solto na janela. Coberto por
+`src/__tests__/tauri-config.test.ts`, já que JSON não tem onde escrever o motivo.
+
 ### Assinatura (macOS e Windows)
 
 Os bundles não são assinados com um certificado pago, então o sistema não reconhece o

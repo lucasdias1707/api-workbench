@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Wand2 } from 'lucide-react';
+import { CodeEditor } from '@/components/request/CodeEditor';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
 import { tryPrettyJson } from '@/lib/format';
 import type { BodyType, KeyValue, RequestRecord } from '@/types';
@@ -84,25 +85,22 @@ export function BodyEditor({ request, onChange }: BodyEditorProps) {
         <>
           <div>
             <div className="section-label">Query</div>
-            <textarea
-              className="editor"
+            <CodeEditor
               value={request.graphql.query}
-              spellCheck={false}
-              onChange={(event) => onChange({ graphql: { ...request.graphql, query: event.target.value } })}
-              aria-label="GraphQL query"
-              data-testid="textarea-graphql-query"
+              onChange={(query) => onChange({ graphql: { ...request.graphql, query } })}
+              ariaLabel="GraphQL query"
+              testId="textarea-graphql-query"
             />
           </div>
           <div>
             <div className="section-label">Variables (JSON)</div>
-            <textarea
-              className="editor"
-              style={{ minHeight: 110 }}
+            <CodeEditor
               value={request.graphql.variables}
-              spellCheck={false}
-              onChange={(event) => onChange({ graphql: { ...request.graphql, variables: event.target.value } })}
-              aria-label="GraphQL variables"
-              data-testid="textarea-graphql-variables"
+              onChange={(variables) => onChange({ graphql: { ...request.graphql, variables } })}
+              language="json"
+              style={{ minHeight: 110 }}
+              ariaLabel="GraphQL variables"
+              testId="textarea-graphql-variables"
             />
           </div>
         </>
@@ -110,14 +108,14 @@ export function BodyEditor({ request, onChange }: BodyEditorProps) {
 
       {(['json', 'text', 'xml'] as BodyType[]).includes(request.bodyType) ? (
         <div>
-          <textarea
-            className={`editor ${jsonError ? 'invalid' : ''}`}
+          <CodeEditor
             value={request.body}
-            spellCheck={false}
+            onChange={(body) => onChange({ body })}
+            language={request.bodyType === 'json' ? 'json' : 'plain'}
+            invalid={Boolean(jsonError)}
             placeholder={request.bodyType === 'json' ? '{\n  "key": "value"\n}' : 'Request payload'}
-            onChange={(event) => onChange({ body: event.target.value })}
-            aria-label="Request body"
-            data-testid="textarea-request-body"
+            ariaLabel="Request body"
+            testId="textarea-request-body"
           />
           {jsonError ? (
             <div className="hint" style={{ color: 'var(--red)', marginTop: 6 }} data-testid="text-json-error">

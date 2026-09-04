@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Braces, ChevronDown, ChevronRight, Copy, FilePlus2, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
+import { Braces, ChevronDown, ChevronRight, Copy, Download, FilePlus2, FolderPlus, Pencil, Search, Terminal, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { PromptDialog } from '@/components/common/PromptDialog';
+import { downloadJson } from '@/lib/download';
+import { exportFileName, exportFolder, exportRequest } from '@/lib/export';
 import { createFolder, createRequest } from '@/lib/factories';
 import { buildTree, countRequests, isDescendantFolder, type TreeNode } from '@/state/selectors';
 import { WorkspaceMenu } from '@/components/sidebar/WorkspaceMenu';
@@ -41,12 +43,28 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
     });
   };
 
+  const saveFolder = (folder: Folder) => {
+    const payload = exportFolder(state, folder.id);
+    if (payload) downloadJson(exportFileName(folder.name), payload);
+  };
+
+  const saveRequest = (request: RequestRecord) => {
+    const payload = exportRequest(state, request.id);
+    if (payload) downloadJson(exportFileName(request.name), payload);
+  };
+
   const folderMenu = (folder: Folder): MenuEntry[] => [
     { kind: 'item', label: 'New request', icon: <FilePlus2 size={13} />, onSelect: () => addRequest(folder.id) },
     { kind: 'item', label: 'New folder', icon: <FolderPlus size={13} />, onSelect: () => setPrompt({ kind: 'new-folder', parentId: folder.id }) },
     { kind: 'separator' },
     { kind: 'item', label: 'Folder variables', icon: <Braces size={13} />, onSelect: () => onFolderVariables(folder.id) },
     { kind: 'item', label: 'Rename', icon: <Pencil size={13} />, onSelect: () => setPrompt({ kind: 'rename-folder', folder }) },
+    {
+      kind: 'item',
+      label: 'Export folder',
+      icon: <Download size={13} />,
+      onSelect: () => saveFolder(folder),
+    },
     {
       kind: 'item',
       label: 'Delete folder',
@@ -59,6 +77,7 @@ export function Sidebar({ onImportCurl, onFolderVariables }: { onImportCurl: () 
   const requestMenu = (request: RequestRecord): MenuEntry[] => [
     { kind: 'item', label: 'Rename', icon: <Pencil size={13} />, onSelect: () => setPrompt({ kind: 'rename-request', request }) },
     { kind: 'item', label: 'Duplicate', icon: <Copy size={13} />, onSelect: () => dispatch({ type: 'request/duplicate', id: request.id }) },
+    { kind: 'item', label: 'Export request', icon: <Download size={13} />, onSelect: () => saveRequest(request) },
     { kind: 'separator' },
     {
       kind: 'item',

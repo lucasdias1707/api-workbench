@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Check, ChevronDown, Pencil, Plus, Trash2, Zap } from 'lucide-react';
+import { Check, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AppMark } from '@/components/common/AppMark';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { PromptDialog } from '@/components/common/PromptDialog';
 import { createEnvironment, createWorkspace } from '@/lib/factories';
@@ -47,7 +48,7 @@ export function WorkspaceMenu() {
         data-testid="button-workspace-menu"
       >
         <span className="brand-mark">
-          <Zap size={13} strokeWidth={2.6} />
+          <AppMark size={13} />
         </span>
         <span className="brand-text">
           <span className="brand-name truncate">{active?.name ?? 'Workspace'}</span>

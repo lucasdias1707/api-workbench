@@ -58,8 +58,27 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/seed.ts`, `lib/factories.ts` — workspace inicial e construtores de registros
 - `state/` — reducer, ações, store por contexto e seletores da árvore
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
+- `lib/export.ts` — recorte de workspace: uma pasta com tudo abaixo dela, ou uma requisição
+- `lib/json-lexer.ts` — tokeniza JSON incompleto para colorir enquanto se digita
+- `lib/editor-keys.ts` — Tab, auto-fechamento de `{ [ "` e envolver seleção, como funções puras
+- `components/request/CodeEditor.tsx` — textarea transparente sobre um espelho colorido
 - `components/sidebar|request|response|dialogs|layout|common` — UI por área
 - `index.css` — design tokens (tema escuro e claro) e todos os componentes visuais
+
+### Brand
+
+`artifacts/api-workbench/brand/logo.svg` é a fonte. `public/favicon.svg` é a mesma arte sem
+o comentário, e `src/components/common/AppMark.tsx` é o mesmo desenho sem o fundo, com os
+traços em `currentColor` para servir o badge da sidebar e qualquer uso monocromático — os
+três precisam mudar juntos.
+
+Os ícones do app saem de `brand/logo.png` (rasterizado a 1024px) com
+`pnpm exec tauri icon brand/logo.png`, rodado de dentro de `artifacts/api-workbench`.
+O comando também gera `icons/android/` e `icons/ios/`; apague, não há alvo móvel.
+
+Restrições que o desenho respeita: sem gradiente (não sobrevive a 16px), traço com 11% da
+tela (a silhueta tem que aguentar tamanho de aba), e legível em uma cor só, que é o que a
+barra de menu do macOS e a bandeja do Windows pedem.
 
 ### Desktop (`artifacts/api-workbench/src-tauri`)
 

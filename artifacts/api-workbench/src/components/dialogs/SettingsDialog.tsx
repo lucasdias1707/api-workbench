@@ -2,12 +2,15 @@ import { useRef } from 'react';
 import { Download, Upload, Zap } from 'lucide-react';
 import { Dialog } from '@/components/common/Dialog';
 import { useToast } from '@/components/common/Toaster';
+import { downloadJson } from '@/lib/download';
+import { isSubtreeExport } from '@/lib/export';
 import { isDesktop } from '@/lib/http';
 import { createSeedState } from '@/lib/seed';
 import { JSON_THEME_PRESETS } from '@/lib/settings';
 import { useWorkspace } from '@/state/workspace-store';
 import type { JsonTheme, PaneLayout, SendMode, ThemeName, WorkspaceState } from '@/types';
 import type { ProxyStatus } from '@/hooks/use-proxy-health';
+import tauriConfig from '../../../src-tauri/tauri.conf.json';
 
 const PROXY_COPY: Record<ProxyStatus, string> = {
   checking: 'Checking whether the companion server is running…',
@@ -15,8 +18,12 @@ const PROXY_COPY: Record<ProxyStatus, string> = {
   unavailable: 'The companion server is not reachable, so requests are sent straight from the browser and are subject to CORS.',
 };
 
-/** Kept in step with src-tauri/tauri.conf.json, which names the installers. */
-const APP_VERSION = '0.1.0';
+/**
+ * Read from the file that also names the installers, rather than copied. The
+ * copy had drifted a release behind, and a version this dialog states wrongly
+ * is worse than no version at all.
+ */
+const APP_VERSION = tauriConfig.version;
 
 const JSON_COLOR_FIELDS: Array<{ field: keyof JsonTheme; label: string; sample: string }> = [
   { field: 'key', label: 'Keys', sample: '"name"' },
@@ -33,22 +40,18 @@ export function SettingsDialog({ onClose, proxyStatus }: { onClose: () => void; 
   const fileRef = useRef<HTMLInputElement>(null);
   const settings = state.settings;
 
-  const exportWorkspace = () => {
-    const payload = JSON.stringify({ ...state, responses: [] }, null, 2);
-    const blob = new Blob([payload], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'api-workbench-workspace.json';
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportWorkspace = () => downloadJson('workspace.json', { ...state, responses: [] });
 
   const importWorkspace = async (file: File) => {
     try {
       const parsed = JSON.parse(await file.text()) as WorkspaceState;
+      if (isSubtreeExport(parsed)) {
+        // Naming what it is beats "not a valid export" for someone who just
+        // exported a folder and reached for the only import button there is.
+        throw new Error('That is a folder or request export. Only whole workspaces can be imported here.');
+      }
       if (!Array.isArray(parsed.requests) || !Array.isArray(parsed.environments)) {
-        throw new Error('That file is not a Carom export.');
+        throw new Error('That file is not a workspace export.');
       }
       dispatch({ type: 'state/replace', state: { ...parsed, responses: parsed.responses ?? [] } });
       toast({ title: 'Workspace imported', description: `${parsed.requests.length} requests loaded.`, kind: 'success' });

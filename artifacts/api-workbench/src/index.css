@@ -643,6 +643,71 @@ textarea.field { height: auto; padding: 7px 8px; resize: vertical; font-family: 
 .editor:focus { border-color: var(--accent); outline: none; }
 .editor.invalid { border-color: var(--red); }
 
+/* The coloured editor: a transparent textarea over a mirror that paints the
+   same text. Every property that affects where a glyph lands is set on the
+   shared `.code-editor > *` rule, because the two only stay aligned while
+   their metrics are identical — a font or padding set on one alone shows up
+   as colours drifting away from the caret. */
+.code-editor {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-code);
+  overflow: hidden;
+  /* The old plain textarea could be dragged taller; keep that, on the wrapper
+     now, since the textarea inside fills it. */
+  resize: vertical;
+}
+.code-editor:focus-within { border-color: var(--accent); }
+.code-editor.invalid { border-color: var(--red); }
+
+.code-editor > * {
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.code-mirror {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--text);
+}
+
+.code-area {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-strong);
+  overflow: auto;
+}
+.code-area:focus { outline: none; }
+.code-area::selection { background: var(--accent-soft); color: transparent; }
+.code-area::placeholder { color: var(--text-faint); }
+
+.jt-key { color: var(--json-key, var(--purple)); }
+.jt-string { color: var(--json-string, var(--green)); }
+.jt-number { color: var(--json-number, var(--orange)); }
+.jt-boolean { color: var(--json-boolean, var(--blue)); }
+.jt-null { color: var(--json-null, var(--text-faint)); }
+.jt-punctuation { color: var(--json-punct, var(--text-faint)); }
+.jt-plain { color: var(--text); }
+
 .status-line {
   display: flex;
   align-items: center;

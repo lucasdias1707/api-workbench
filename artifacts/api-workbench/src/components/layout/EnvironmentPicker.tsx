@@ -21,7 +21,7 @@ export function EnvironmentPicker({ onManage }: { onManage: () => void }) {
   const entries: MenuEntry[] = [
     {
       kind: 'item',
-      label: 'Base only',
+      label: 'No environment',
       icon: state.activeEnvironmentId === null ? <Check size={13} /> : <span style={{ width: 13 }} />,
       onSelect: () => dispatch({ type: 'environment/activate', id: null }),
     },
@@ -66,7 +66,7 @@ export function EnvironmentPicker({ onManage }: { onManage: () => void }) {
           const rect = event.currentTarget.getBoundingClientRect();
           setMenu({ x: rect.right - 190, y: rect.bottom + 4 });
         }}
-        title={active ? `Environment: ${active.name}` : 'Only base variables are applied'}
+        title={active ? `Environment: ${active.name}` : 'No environment — only the base variables apply'}
         data-testid="button-environment-picker"
       >
         {active ? (
@@ -75,7 +75,7 @@ export function EnvironmentPicker({ onManage }: { onManage: () => void }) {
           <Layers size={13} style={{ color: 'var(--text-faint)' }} />
         )}
         <span className="truncate" data-testid="text-active-environment">
-          {active?.name ?? 'Base only'}
+          {active?.name ?? 'No environment'}
         </span>
         <ChevronDown size={12} style={{ color: 'var(--text-faint)' }} />
       </button>

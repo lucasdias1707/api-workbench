@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Check, ChevronDown, Pencil, Plus, Trash2 } from 'lucide-react';
 import { AppMark } from '@/components/common/AppMark';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { PromptDialog } from '@/components/common/PromptDialog';
 import { createEnvironment, createWorkspace } from '@/lib/factories';
+import { useDeleteWithUndo } from '@/hooks/use-delete-with-undo';
 import { useWorkspace } from '@/state/workspace-store';
 
 /** Workspace identity in the sidebar header, doubling as the switcher. */
@@ -11,6 +13,8 @@ export function WorkspaceMenu() {
   const { state, dispatch } = useWorkspace();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [prompt, setPrompt] = useState<'create' | 'rename' | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const deleteWithUndo = useDeleteWithUndo();
 
   const active = state.workspaces.find((workspace) => workspace.id === state.activeWorkspaceId);
   const requestCount = state.requests.filter((request) => request.workspaceId === state.activeWorkspaceId).length;
@@ -33,7 +37,7 @@ export function WorkspaceMenu() {
       label: 'Delete workspace',
       icon: <Trash2 size={13} />,
       danger: true,
-      onSelect: () => dispatch({ type: 'workspace/delete', id: state.activeWorkspaceId }),
+      onSelect: () => setConfirming(true),
     });
   }
 
@@ -60,6 +64,28 @@ export function WorkspaceMenu() {
       </button>
 
       {menu ? <ContextMenu x={menu.x} y={menu.y} entries={entries} onClose={() => setMenu(null)} /> : null}
+
+      {confirming ? (
+        <ConfirmDialog
+          title="Delete this workspace?"
+          message={
+            <>
+              <strong>{active?.name}</strong> goes, and so does everything in it: {requestCount} request
+              {requestCount === 1 ? '' : 's'}, its folders and its environments. You can undo this from the
+              notification straight afterwards.
+            </>
+          }
+          confirmLabel="Delete workspace"
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            deleteWithUndo(
+              { type: 'workspace/delete', id: state.activeWorkspaceId },
+              { title: `Deleted ${active?.name ?? 'workspace'}`, detail: 'Its folders, requests and environments went too.' },
+            );
+            setConfirming(false);
+          }}
+        />
+      ) : null}
 
       {prompt === 'create' ? (
         <PromptDialog

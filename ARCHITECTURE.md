@@ -60,6 +60,8 @@ Gatekeeper do macOS; mudou algo nesse fluxo, atualize os dois.
 - `lib/template.ts` — resolução em escopos com procedência (o que ganhou, o que foi sombreado)
 - `lib/query.ts` — espelha a query string da URL na tabela de Params (a URL mantém a sua)
 - `lib/inherit.ts` — de onde vêm a auth e os scripts de uma request: pasta mais próxima, ou ela mesma
+- `lib/mirror-tokens.ts` — sobrepõe as `{{variáveis}}` na coloração JSON do editor
+- `lib/variables.ts` — copiar variáveis de um ambiente ou pasta para outro
 - `lib/scripts.ts` — executa os scripts pré/pós, coletando variáveis, headers, logs e testes
 - `lib/pm.ts` — objeto `pm` no formato do Postman, para scripts importados rodarem sem reescrita
 - `lib/postman.ts` — leitura de uma coleção (v2.1) ou de um environment exportados do Postman
@@ -140,6 +142,19 @@ barra de menu do macOS e a bandeja do Windows pedem.
   pasta leva tudo abaixo dela; desmarcar uma request dentro de uma pasta marcada deixa o
   resto — é para isso que serve um checkbox por linha. Uma pasta desmarcada ainda vem junto
   quando algo dentro dela foi marcado: ela é o caminho até aquela request.
+- **Desfazer não é rollback.** O snapshot guardado antes de uma exclusão é o estado inteiro,
+  mas `restore` só recoloca o que sumiu — o que continua lá foi editado depois do snapshot, e
+  a edição é mais nova. Assim, digitar num request enquanto o toast de "Deleted" está na tela
+  não é desfeito junto ao clicar em Undo.
+- **Interpolação sempre funcionou; o que faltava era o aviso.** `{{token}}` em Auth e no body
+  sempre foi substituído — mas um erro de digitação como `{{tokne}}` saía como texto literal
+  sem nenhum sinal. Agora os mesmos campos usam o `TemplateField` da barra de URL, e o espelho
+  do editor pinta as variáveis por cima da coloração JSON (`lib/mirror-tokens.ts`). O
+  invariante do lexer vale igual ali: juntar os tokens tem que reproduzir a entrada exatamente,
+  senão as cores escorregam de baixo do cursor.
+- **Uma variável "global" nova vai para o ambiente selecionado**, não para o Base. Definir uma
+  URL de staging com staging ativo e ela cair no Base, valendo para todos, não é o que aquele
+  clique quer dizer.
 - **Respostas com orçamento.** Corpos são truncados em 128 KB e o gravador vai descartando
   respostas quando o localStorage estoura a cota, para nunca perder as requisições do usuário.
 
@@ -167,6 +182,11 @@ barra de menu do macOS e a bandeja do Windows pedem.
 - Passar o mouse numa `{{variável}}` mostra valor e origem; clicar abre um popover que
   edita no lugar, gravando na pasta ou ambiente de onde o valor veio
 - Cores do JSON configuráveis, com presets (Workbench, Monokai, Nord, Solarized)
+- `{{variáveis}}` marcadas em toda parte: URL, Auth, body, GraphQL e scripts. Vermelho quando
+  não resolvem — é literalmente o que vai no fio
+- Copiar variáveis de um ambiente ou pasta para outro, escolhendo quais e se leva os valores
+- Excluir pede confirmação e o toast oferece desfazer
+- Expandir/recolher todas as pastas, e menu de contexto nas abas (fechar, outras, todas)
 - Ambientes base + sobreposição, com editor de variáveis e cor
 - Paleta de comandos (⌘K) e atalhos: ⌘⏎ enviar, ⌘N nova, ⌘W fechar aba, ⌘E ambientes,
   ⌘B barra lateral, ⌘, configurações

@@ -1,14 +1,39 @@
-import { X } from 'lucide-react';
+import { useState } from 'react';
+import { X, XCircle } from 'lucide-react';
+import { ContextMenu, type MenuEntry } from '@/components/common/ContextMenu';
 import { useWorkspace } from '@/state/workspace-store';
 
 /** Open-request tabs, mirroring how a desktop client keeps several in flight. */
 export function TabStrip() {
   const { state, dispatch } = useWorkspace();
+  const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null);
   const tabs = state.openTabIds
     .map((id) => state.requests.find((request) => request.id === id))
     .filter((request): request is NonNullable<typeof request> => Boolean(request));
 
   if (tabs.length === 0) return <div className="tabstrip" />;
+
+  /**
+   * Right-click a tab, act on that tab. "Close others" keeps the one that was
+   * right-clicked, not the one that happens to be focused — otherwise the menu
+   * would act on something the pointer is nowhere near.
+   */
+  const tabMenu = (id: string): MenuEntry[] => [
+    { kind: 'item', label: 'Close', icon: <X size={13} />, onSelect: () => dispatch({ type: 'request/close-tab', id }) },
+    {
+      kind: 'item',
+      label: 'Close others',
+      icon: <XCircle size={13} />,
+      onSelect: () => dispatch({ type: 'request/close-other-tabs', id }),
+    },
+    { kind: 'separator' },
+    {
+      kind: 'item',
+      label: 'Close all',
+      icon: <XCircle size={13} />,
+      onSelect: () => dispatch({ type: 'request/close-all-tabs' }),
+    },
+  ];
 
   return (
     <div className="tabstrip" role="tablist" aria-label="Open requests">
@@ -27,6 +52,11 @@ export function TabStrip() {
                 event.preventDefault();
                 dispatch({ type: 'request/open', id: request.id });
               }
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setMenu({ x: event.clientX, y: event.clientY, entries: tabMenu(request.id) });
             }}
             onAuxClick={(event) => {
               // Middle click closes, as in a browser.
@@ -50,6 +80,7 @@ export function TabStrip() {
           </div>
         );
       })}
+      {menu ? <ContextMenu x={menu.x} y={menu.y} entries={menu.entries} onClose={() => setMenu(null)} /> : null}
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, Plus, Trash2 } from 'lucide-react';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { CopyVariablesDialog } from '@/components/dialogs/CopyVariablesDialog';
 import { Dialog } from '@/components/common/Dialog';
 import { KeyValueTable } from '@/components/request/KeyValueTable';
 import { createEnvironment, ENVIRONMENT_COLORS } from '@/lib/factories';
+import { useDeleteWithUndo } from '@/hooks/use-delete-with-undo';
 import { useWorkspace } from '@/state/workspace-store';
 import type { KeyValue } from '@/types';
 
@@ -16,6 +19,9 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
   const base = environments.find((environment) => environment.isBase) ?? environments[0];
   // Open on whatever is in use, so managing follows straight on from picking.
   const [selectedId, setSelectedId] = useState(state.activeEnvironmentId ?? base?.id ?? '');
+  const [copying, setCopying] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const deleteWithUndo = useDeleteWithUndo();
 
   const selected = environments.find((environment) => environment.id === selectedId) ?? base;
   if (!selected) return null;
@@ -85,10 +91,7 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
             {selected.isBase ? null : (
               <button
                 className="btn btn-sm btn-danger"
-                onClick={() => {
-                  dispatch({ type: 'environment/delete', id: selected.id });
-                  setSelectedId(base.id);
-                }}
+                onClick={() => setConfirming(true)}
                 data-testid="button-delete-environment"
               >
                 <Trash2 size={12} /> Delete
@@ -133,6 +136,13 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
               data-testid="input-environment-color"
             />
           </div>
+          <div className="section-label" style={{ margin: 0 }}>
+            Variables
+            <span className="spacer" />
+            <button className="btn btn-sm" onClick={() => setCopying(true)} data-testid="button-copy-variables">
+              <ArrowDownToLine size={12} /> Copy from…
+            </button>
+          </div>
           <KeyValueTable
             items={selected.variables}
             onChange={setVariables}
@@ -146,6 +156,36 @@ export function EnvironmentDialog({ onClose }: { onClose: () => void }) {
           </p>
         </div>
       </div>
+
+      {confirming ? (
+        <ConfirmDialog
+          title="Delete this environment?"
+          message={
+            <>
+              <strong>{selected.name}</strong> and its {selected.variables.length} variable
+              {selected.variables.length === 1 ? '' : 's'} will be removed. Requests using them fall back to the base
+              environment. You can undo this from the notification straight afterwards.
+            </>
+          }
+          onCancel={() => setConfirming(false)}
+          onConfirm={() => {
+            deleteWithUndo(
+              { type: 'environment/delete', id: selected.id },
+              { title: `Deleted ${selected.name}` },
+            );
+            setSelectedId(base.id);
+            setConfirming(false);
+          }}
+        />
+      ) : null}
+
+      {copying ? (
+        <CopyVariablesDialog
+          destination={selected}
+          onApply={setVariables}
+          onClose={() => setCopying(false)}
+        />
+      ) : null}
     </Dialog>
   );
 }

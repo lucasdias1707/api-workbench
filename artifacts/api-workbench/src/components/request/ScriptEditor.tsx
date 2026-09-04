@@ -1,4 +1,5 @@
 import { CodeEditor } from '@/components/request/CodeEditor';
+import { useWorkspace } from '@/state/workspace-store';
 
 type ScriptEditorProps = {
   preScript: string;
@@ -23,6 +24,7 @@ const POST_PLACEHOLDER = `// const body = carom.json();
  * it stays visible rather than being tucked into a tooltip.
  */
 export function ScriptEditor({ preScript, postScript, onChange, subject, testPrefix }: ScriptEditorProps) {
+  const { variableTable } = useWorkspace();
   const scope =
     subject === 'folder'
       ? 'These run around every request in this folder, outside any script the request itself has.'
@@ -32,6 +34,7 @@ export function ScriptEditor({ preScript, postScript, onChange, subject, testPre
     <div className="pane-pad stack">
       <div className="section-label">Pre-request script</div>
       <CodeEditor
+        variables={variableTable}
         value={preScript}
         onChange={(value) => onChange({ preScript: value })}
         language="plain"
@@ -43,6 +46,7 @@ export function ScriptEditor({ preScript, postScript, onChange, subject, testPre
 
       <div className="section-label">Post-response script</div>
       <CodeEditor
+        variables={variableTable}
         value={postScript}
         onChange={(value) => onChange({ postScript: value })}
         language="plain"

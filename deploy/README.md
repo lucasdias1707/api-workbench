@@ -128,7 +128,7 @@ sudo corepack enable && corepack prepare pnpm@10 --activate
 
 ```bash
 sudo mkdir -p /srv/api-workbench && sudo chown "$USER" /srv/api-workbench
-git clone https://github.com/lucasdias1707/api-workbench.git /srv/api-workbench
+git clone https://github.com/lucasdias1707/carom-client-api.git /srv/api-workbench
 cd /srv/api-workbench
 pnpm install --frozen-lockfile
 pnpm run check                                    # typecheck + tests

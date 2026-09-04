@@ -10,7 +10,7 @@ import { isDesktop } from '@/lib/http';
  * there is one place that knows the plugin exists.
  */
 
-export const REPO_URL = 'https://github.com/lucasdias1707/api-workbench';
+export const REPO_URL = 'https://github.com/lucasdias1707/carom-client-api';
 
 /** How the running copy was installed. Mirrors the `install_kind` command. */
 export type InstallKind = 'macos' | 'windows' | 'appimage' | 'linux-package' | 'web';

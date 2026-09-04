@@ -22,12 +22,12 @@ describe('canSelfUpdate', () => {
 describe('releasePageUrl', () => {
   it('points at a specific tag when a version is known', () => {
     expect(releasePageUrl('0.3.0')).toBe(
-      'https://github.com/lucasdias1707/api-workbench/releases/tag/v0.3.0',
+      'https://github.com/lucasdias1707/carom-client-api/releases/tag/v0.3.0',
     );
   });
 
   it('falls back to the latest release when it is not', () => {
-    expect(releasePageUrl()).toBe('https://github.com/lucasdias1707/api-workbench/releases/latest');
+    expect(releasePageUrl()).toBe('https://github.com/lucasdias1707/carom-client-api/releases/latest');
   });
 });
 

@@ -22,7 +22,7 @@ Para levar tudo:
 
 ## Download
 
-Os instaladores estão em **[Releases](https://github.com/lucasdias1707/api-workbench/releases/latest)**.
+Os instaladores estão em **[Releases](https://github.com/lucasdias1707/carom-client-api/releases/latest)**.
 
 | Sistema | Arquivo |
 | --- | --- |

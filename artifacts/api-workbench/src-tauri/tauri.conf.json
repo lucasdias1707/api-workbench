@@ -29,7 +29,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/lucasdias1707/api-workbench/releases/latest/download/latest.json"
+        "https://github.com/lucasdias1707/carom-client-api/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

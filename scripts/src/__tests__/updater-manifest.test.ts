@@ -7,7 +7,7 @@ import {
   type SignedBundle,
 } from '../updater-manifest.js';
 
-const REPO = 'https://github.com/lucasdias1707/api-workbench';
+const REPO = 'https://github.com/lucasdias1707/carom-client-api';
 
 /**
  * The four bundles a release carries.
